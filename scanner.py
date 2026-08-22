@@ -10,6 +10,7 @@ def run_scan(client_id, access_token, tg_bot=None, tg_chat=None):
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
+    startup_msg = "Telegram not configured. Add Telegram Token and Chat ID to get startup balance alerts."
     # Send startup message if Telegram is configured
     if tg_bot and tg_chat:
         try:
@@ -21,9 +22,10 @@ def run_scan(client_id, access_token, tg_bot=None, tg_chat=None):
                 open_pos = len(pos_df[pos_df['positionType'] == 'OPEN'])
                 closed_pos = len(pos_df[pos_df['positionType'] == 'CLOSED'])
                 
-            startup_msg = f"✅ *Scanner Connected*\nBalance: ₹{balance}\nPositions: {open_pos} Open | {closed_pos} Closed"
+            startup_msg = f"Scanner Connected! Balance: ₹{balance} | Positions: {open_pos} Open, {closed_pos} Closed"
             tsl.send_telegram_alert(startup_msg, tg_chat, tg_bot)
         except Exception as e:
+            startup_msg = f"Failed to retrieve balance/positions from Dhan: {str(e)}"
             print(f"Failed to send startup message: {e}")
 
     symbols = [("RELIANCE", "NSE"), ("TCS", "NSE"), ("CRUDEOIL", "MCX"), ("GOLD", "MCX")]
@@ -72,4 +74,4 @@ def run_scan(client_id, access_token, tg_bot=None, tg_chat=None):
             "status": "SUCCESS"
         })
         
-    return {"status": "success", "results": results}
+    return {"status": "success", "startup_msg": startup_msg, "results": results}
