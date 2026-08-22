@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Algo Scanner Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-200 min-h-screen p-8">
+
+    <div class="max-w-5xl mx-auto space-y-8">
+        
+        <!-- Header -->
+        <header class="flex justify-between items-center pb-6 border-b border-slate-800">
+            <div>
+                <h1 class="text-3xl font-bold text-white tracking-tight">Scanner Dashboard</h1>
+                <p class="text-slate-400 mt-1">Dhan Tradehull Integration</p>
+            </div>
+            <div id="statusBadge" class="hidden rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 flex items-center gap-3">
+                <span class="px-2 py-0.5 rounded-md bg-rose-500 text-white text-xs font-bold">ERROR</span>
+                <span id="statusText" class="text-rose-200"></span>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            <!-- Credentials Panel -->
+            <div class="lg:col-span-1 space-y-6">
+                <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-xl relative overflow-hidden">
+                    <h2 class="text-lg font-semibold text-white mb-4">Credentials</h2>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-400 mb-1">Dhan Client ID *</label>
+                            <input type="text" id="client_id" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" placeholder="e.g. 1100XXXX">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-400 mb-1">Dhan Access Token *</label>
+                            <input type="password" id="access_token" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" placeholder="Paste your token">
+                        </div>
+                        
+                        <hr class="border-slate-800 my-4">
+                        
+                        <div>
+                            <label class="block text-xs font-medium text-slate-400 mb-1">Telegram Bot Token (Optional)</label>
+                            <input type="text" id="tg_bot" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" placeholder="From @BotFather">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-400 mb-1">Telegram Chat ID (Optional)</label>
+                            <input type="text" id="tg_chat" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" placeholder="Your Chat ID">
+                        </div>
+                        
+                        <button id="runBtn" onclick="runScan()" class="w-full mt-6 bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2">
+                            <span>Run Full Scan</span>
+                            <svg id="spinner" class="animate-spin -ml-1 mr-3 h-5 w-5 text-white hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results Panel -->
+            <div class="lg:col-span-2">
+                <div class="bg-slate-900 border border-slate-800 rounded-xl shadow-xl overflow-hidden">
+                    <div class="p-6 border-b border-slate-800 flex justify-between items-center">
+                        <h2 class="text-lg font-semibold text-white">Scan Results</h2>
+                        <span id="scanTime" class="text-xs text-slate-400"></span>
+                    </div>
+                    
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left">
+                            <thead class="text-xs text-slate-400 uppercase bg-slate-950/50">
+                                <tr>
+                                    <th class="px-6 py-3 font-semibold">Symbol</th>
+                                    <th class="px-6 py-3 font-semibold text-right">LTP</th>
+                                    <th class="px-6 py-3 font-semibold text-right">EMA5</th>
+                                    <th class="px-6 py-3 font-semibold text-right">EMA15</th>
+                                    <th class="px-6 py-3 font-semibold text-right">EMA50</th>
+                                    <th class="px-6 py-3 font-semibold text-right">WPR70</th>
+                                    <th class="px-6 py-3 font-semibold text-center">Signal</th>
+                                </tr>
+                            </thead>
+                            <tbody id="resultsBody" class="divide-y divide-slate-800/50">
+                                <tr>
+                                    <td colspan="7" class="px-6 py-12 text-center text-slate-500">
+                                        Enter your credentials and click <b>Run Scan</b> to fetch live data.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+        </div>
+    </div>
+
+    <script>
+        // Pre-fill from localStorage for convenience
+        document.getElementById('client_id').value = localStorage.getItem('dhan_client_id') || '';
+        document.getElementById('access_token').value = localStorage.getItem('dhan_access_token') || '';
+        document.getElementById('tg_bot').value = localStorage.getItem('tg_bot') || '';
+        document.getElementById('tg_chat').value = localStorage.getItem('tg_chat') || '';
+
+        async function runScan() {
+            const btn = document.getElementById('runBtn');
+            const spinner = document.getElementById('spinner');
+            const tbody = document.getElementById('resultsBody');
+            const badge = document.getElementById('statusBadge');
+            const statusText = document.getElementById('statusText');
+            
+            const clientId = document.getElementById('client_id').value;
+            const accessToken = document.getElementById('access_token').value;
+            const tgBot = document.getElementById('tg_bot').value;
+            const tgChat = document.getElementById('tg_chat').value;
+
+            if(!clientId || !accessToken) {
+                badge.classList.remove('hidden');
+                statusText.textContent = 'Client ID and Access Token are required.';
+                return;
+            }
+
+            // Save to localStorage
+            localStorage.setItem('dhan_client_id', clientId);
+            localStorage.setItem('dhan_access_token', accessToken);
+            localStorage.setItem('tg_bot', tgBot);
+            localStorage.setItem('tg_chat', tgChat);
+
+            badge.classList.add('hidden');
+            btn.disabled = true;
+            spinner.classList.remove('hidden');
+            tbody.innerHTML = '<tr><td colspan="7" class="px-6 py-12 text-center text-slate-400">Scanning in progress... This may take a moment.</td></tr>';
+
+            const base = window.location.pathname.replace(/\/?$/, '/');
+            
+            try {
+                const res = await fetch(base + 'scan', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        client_id: clientId,
+                        access_token: accessToken,
+                        tg_bot: tgBot,
+                        tg_chat: tgChat
+                    })
+                });
+                
+                const data = await res.json();
+                
+                if (data.status === 'error') {
+                    badge.classList.remove('hidden');
+                    statusText.textContent = data.message;
+                    tbody.innerHTML = '<tr><td colspan="7" class="px-6 py-12 text-center text-slate-500">Scan failed.</td></tr>';
+                } else {
+                    renderResults(data.results);
+                }
+            } catch (err) {
+                badge.classList.remove('hidden');
+                statusText.textContent = 'Network error or server unreachable.';
+                tbody.innerHTML = '<tr><td colspan="7" class="px-6 py-12 text-center text-slate-500">Scan failed.</td></tr>';
+            } finally {
+                btn.disabled = false;
+                spinner.classList.add('hidden');
+            }
+        }
+
+        function renderResults(results) {
+            const tbody = document.getElementById('resultsBody');
+            tbody.innerHTML = '';
+            
+            // Sort: Bullish/Bearish first, then Neutral, then Errors
+            const rank = r => r.status === 'ERROR' ? 3 : (r.signal === 'NEUTRAL' ? 2 : (r.signal === 'BULLISH' ? 0 : 1));
+            results.sort((a, b) => rank(a) - rank(b));
+            
+            document.getElementById('scanTime').textContent = "Last scan: " + new Date().toLocaleTimeString();
+
+            results.forEach(r => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-800/20 transition-colors';
+                
+                if (r.status === 'ERROR') {
+                    tr.innerHTML = `
+                        <td class="px-6 py-4 font-medium">${r.symbol}</td>
+                        <td colspan="6" class="px-6 py-4 text-amber-400 text-right text-xs">${r.message}</td>
+                    `;
+                } else {
+                    let sigHtml = `<span class="px-2.5 py-1 rounded-full text-xs font-medium bg-slate-700/40 text-slate-400">NEUTRAL</span>`;
+                    if (r.signal === 'BULLISH') {
+                        sigHtml = `<span class="px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/15 text-emerald-400">BULLISH</span>`;
+                    } else if (r.signal === 'BEARISH') {
+                        sigHtml = `<span class="px-2.5 py-1 rounded-full text-xs font-medium bg-rose-500/15 text-rose-400">BEARISH</span>`;
+                    }
+
+                    tr.innerHTML = `
+                        <td class="px-6 py-4 font-medium text-white">${r.symbol}</td>
+                        <td class="px-6 py-4 text-right tabular-nums">${r.ltp.toFixed(2)}</td>
+                        <td class="px-6 py-4 text-right tabular-nums">${r.ema5.toFixed(2)}</td>
+                        <td class="px-6 py-4 text-right tabular-nums">${r.ema15.toFixed(2)}</td>
+                        <td class="px-6 py-4 text-right tabular-nums">${r.ema50.toFixed(2)}</td>
+                        <td class="px-6 py-4 text-right tabular-nums">${r.wpr70.toFixed(2)}</td>
+                        <td class="px-6 py-4 text-center">${sigHtml}</td>
+                    `;
+                }
+                tbody.appendChild(tr);
+            });
+            
+            if (results.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="px-6 py-12 text-center text-slate-500">Scan complete - no data returned.</td></tr>';
+            }
+        }
+    </script>
+</body>
+</html>

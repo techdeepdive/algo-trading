@@ -1,0 +1,6 @@
+dhanhq
+Dhan-Tradehull
+pandas
+python-dotenv
+flask
+gunicorn
