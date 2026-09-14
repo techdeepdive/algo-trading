@@ -6,7 +6,10 @@
     <title>Algo Scanner Dashboard</title>
     <link rel="icon" type="image/jpeg" href="/static/logo.jpg">
     <script src="https://cdn.tailwindcss.com"></script>
-    <script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+    
+
+<script>
         tailwind.config = {
             darkMode: 'class',
             theme: {
@@ -21,32 +24,79 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; }
+        .tab-btn { transition: all 0.2s ease; }
+        .tab-btn.active {
+            color: #818cf8;
+            border-bottom-color: #818cf8;
+            background: rgba(99, 102, 241, 0.05);
+        }
+        .tab-btn:hover:not(.active) {
+            color: #a5b4fc;
+            background: rgba(99, 102, 241, 0.03);
+        }
+        .tab-content { display: none; animation: fadeIn 0.25s ease; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+        .stat-card {
+            background: linear-gradient(135deg, rgba(30,41,59,0.8), rgba(15,23,42,0.9));
+            border: 1px solid rgba(99,102,241,0.15);
+            transition: border-color 0.2s, transform 0.15s;
+        }
+        .stat-card:hover { border-color: rgba(99,102,241,0.35); transform: translateY(-1px); }
+        input[list]::-webkit-calendar-picker-indicator { opacity: 0; }
+        input[type="date"]::-webkit-calendar-picker-indicator {
+            filter: invert(1);
+            opacity: 0.6;
+            cursor: pointer;
+        }
+        input[type="date"]::-webkit-calendar-picker-indicator:hover {
+            opacity: 1;
+        }
     </style>
 </head>
-<body class="bg-slate-950 text-slate-200 min-h-screen p-8">
+<body class="bg-slate-950 text-slate-200 min-h-screen p-6 lg:p-8">
 
-    <div class="max-w-5xl mx-auto space-y-8">
+    <div class="max-w-7xl mx-auto space-y-6">
         
         <!-- Header -->
-        <header class="flex justify-between items-center pb-6 border-b border-slate-800">
+        <header class="flex justify-between items-center pb-4 border-b border-slate-800">
             <div class="flex items-center gap-4">
-                <img src="/static/logo.jpg" alt="Logo" class="w-12 h-12 rounded-xl object-cover shadow-lg border border-slate-700">
-                <h1 class="text-3xl font-bold text-white tracking-tight">Algo Scanner Dashboard</h1>
+                <img src="/static/logo.jpg" alt="Logo" class="w-11 h-11 rounded-xl object-cover shadow-lg border border-slate-700">
+                <h1 class="text-2xl font-bold text-white tracking-tight">Algo Scanner Dashboard</h1>
             </div>
-            <div id="statusBadge" class="hidden rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 flex items-center gap-3">
+            <div id="globalStatus" class="hidden rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-2.5 flex items-center gap-3">
                 <span class="px-2 py-0.5 rounded-md bg-rose-500 text-white text-xs font-bold">ERROR</span>
-                <span id="statusText" class="text-rose-200"></span>
+                <span id="globalStatusText" class="text-rose-200 text-sm"></span>
             </div>
         </header>
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- Tab Navigation -->
+        <nav class="flex gap-0 border-b border-slate-800">
+            <button onclick="switchTab('home', this)" class="tab-btn active px-4 py-3 text-sm font-medium border-b-2 border-indigo-500 text-indigo-400 transition-colors flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+                Home
+            </button>
+            <button onclick="switchTab('historical', this)" class="tab-btn text-slate-400 hover:text-slate-200 px-4 py-3 text-sm font-medium border-b-2 border-transparent transition-colors flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                Historical Data
+            </button>
+            <button onclick="switchTab('backtest', this)" class="tab-btn text-slate-400 hover:text-slate-200 px-4 py-3 text-sm font-medium border-b-2 border-transparent transition-colors flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                Backtesting
+            </button>
+            <button onclick="switchTab('news', this)" class="tab-btn text-slate-400 hover:text-slate-200 px-4 py-3 text-sm font-medium border-b-2 border-transparent transition-colors flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"/></svg>
+                Market News (AI)
+            </button>
+        </nav>
+
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
             
-            <!-- Credentials Panel -->
-            <div class="lg:col-span-1 space-y-6">
-                <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-xl relative overflow-hidden">
-                    <h2 class="text-lg font-semibold text-white mb-4">Credentials</h2>
-                    
-                    <div class="space-y-4">
+            <!-- Shared Credentials Sidebar -->
+            <div class="lg:col-span-1">
+                <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl sticky top-6">
+                    <h2 class="text-base font-semibold text-white mb-4">Credentials</h2>
+                    <div class="space-y-3">
                         <div>
                             <label class="block text-xs font-medium text-slate-400 mb-1">Dhan Client ID *</label>
                             <input type="password" id="client_id" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" placeholder="e.g. 1100XXXX">
@@ -55,140 +105,472 @@
                             <label class="block text-xs font-medium text-slate-400 mb-1">Dhan Access Token *</label>
                             <input type="password" id="access_token" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" placeholder="Paste your token">
                         </div>
-                        
-                        <hr class="border-slate-800 my-4">
-                        
+                        <hr class="border-slate-800">
                         <div>
-                            <label class="block text-xs font-medium text-slate-400 mb-1">Telegram Bot Token (Optional)</label>
+                            <label class="block text-xs font-medium text-slate-400 mb-1">Telegram Bot Token</label>
                             <input type="password" id="tg_bot" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" placeholder="From @BotFather">
                         </div>
                         <div>
-                            <label class="block text-xs font-medium text-slate-400 mb-1">Telegram Chat ID (Optional)</label>
+                            <label class="block text-xs font-medium text-slate-400 mb-1">Telegram Chat ID</label>
                             <input type="password" id="tg_chat" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" placeholder="Your Chat ID">
                         </div>
+                    </div>
+                        <hr class="border-slate-800">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-400 mb-1">Gemini API Key</label>
+                            <input type="password" id="gemini_key" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" placeholder="AI News Hub access...">
+                        </div>
+                </div>
+            </div>
+
+            <!-- Main Content Area -->
+            <div class="lg:col-span-3">
+
+                <!-- ==================== HOME TAB ==================== -->
+                <div id="tab-home" class="tab-content active">
+                    <div id="startupAlert" class="hidden mb-4 rounded-xl border border-indigo-500/40 bg-indigo-500/10 px-4 py-3 items-center gap-3">
+                        <span class="px-2 py-0.5 rounded-md bg-indigo-500 text-white text-xs font-bold mr-2">STARTUP</span>
+                        <span id="startupText" class="text-indigo-200 text-sm"></span>
+                    </div>
+
+                    <div class="bg-slate-900 border border-slate-800 rounded-xl shadow-xl overflow-hidden">
+                        <div class="p-5 border-b border-slate-800 flex justify-between items-center">
+                            <h2 class="text-lg font-semibold text-white">Scan Results</h2>
+                            <div class="flex items-center gap-3">
+                                <span id="scanTime" class="text-xs text-slate-400"></span>
+                                <button id="runBtn" onclick="runScan()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors flex items-center gap-2">
+                                    <span>Run Scan</span>
+                                    <svg id="spinner" class="animate-spin h-4 w-4 text-white hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm text-left">
+                                <thead class="text-xs text-slate-400 uppercase bg-slate-950/50">
+                                    <tr>
+                                        <th class="px-5 py-3 font-semibold">Symbol</th>
+                                        <th class="px-5 py-3 font-semibold text-right">LTP</th>
+                                        <th class="px-5 py-3 font-semibold text-right">EMA5</th>
+                                        <th class="px-5 py-3 font-semibold text-right">EMA15</th>
+                                        <th class="px-5 py-3 font-semibold text-right">EMA50</th>
+                                        <th class="px-5 py-3 font-semibold text-right">WPR70</th>
+                                        <th class="px-5 py-3 font-semibold text-center">Signal</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="resultsBody" class="divide-y divide-slate-800/50">
+                                    <tr>
+                                        <td colspan="7" class="px-5 py-10 text-center text-slate-500">
+                                            Enter your credentials and click <b>Run Scan</b> to fetch live data.
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ==================== HISTORICAL DATA TAB ==================== -->
+                <div id="tab-historical" class="tab-content">
+                    <div class="bg-slate-900 border border-slate-800 rounded-xl shadow-xl p-5">
+                        <h2 class="text-lg font-semibold text-white mb-5">Download Historical Data</h2>
                         
-                        <button id="runBtn" onclick="runScan()" class="w-full mt-6 bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2">
-                            <span>Run Full Scan</span>
-                            <svg id="spinner" class="animate-spin -ml-1 mr-3 h-5 w-5 text-white hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+                            <div class="md:col-span-2">
+                                <label class="block text-xs font-medium text-slate-400 mb-1">Stock / Index Symbol *</label>
+                                <input type="text" id="hist_symbol" list="symbolList" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" placeholder="Type to search... (e.g. RELIANCE, NIFTY, CRUDEOIL)" autocomplete="off">
+                                <datalist id="symbolList"></datalist>
+                                <div class="flex items-center gap-2 mt-1.5">
+                                    <span id="hist_exchange_badge" class="hidden px-2 py-0.5 rounded text-xs font-medium bg-indigo-500/15 text-indigo-400"></span>
+                                    <span id="hist_symbol_count" class="text-xs text-slate-500"></span>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-400 mb-1">From Date</label>
+                                <input type="date" id="hist_from" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-400 mb-1">To Date</label>
+                                <input type="date" id="hist_to" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-400 mb-1">Timeframe</label>
+                                <select id="hist_timeframe" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500">
+                                    <option value="1">1 Minute</option>
+                                    <option value="5">5 Minutes</option>
+                                    <option value="15">15 Minutes</option>
+                                    <option value="60">60 Minutes</option>
+                                    <option value="DAY" selected>Daily</option>
+                                </select>
+                            </div>
+                            <div class="flex items-end">
+                                <button id="downloadBtn" onclick="downloadHistorical()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                                    <span>Download CSV</span>
+                                    <svg id="histSpinner" class="animate-spin h-4 w-4 text-white hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Download result -->
+                        <div id="histResult" class="hidden rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 mt-4">
+                            <div class="flex items-center gap-2 mb-2">
+                                <svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                <span class="text-emerald-300 font-medium text-sm">Download Complete</span>
+                            </div>
+                            <p id="histResultText" class="text-emerald-200/80 text-sm"></p>
+                        </div>
+
+                        <!-- Error result -->
+                        <div id="histError" class="hidden rounded-xl border border-rose-500/30 bg-rose-500/10 p-4 mt-4">
+                            <div class="flex items-center gap-2">
+                                <svg class="w-5 h-5 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                <span id="histErrorText" class="text-rose-300 text-sm"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ==================== BACKTESTING TAB ==================== -->
+                <div id="tab-backtest" class="tab-content">
+                    <div class="bg-slate-900 border border-slate-800 rounded-xl shadow-xl p-5 mb-6">
+                        <h2 class="text-lg font-semibold text-white mb-5">Backtest Configuration</h2>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+                            <!-- CSV Source -->
+                            <div class="md:col-span-2">
+                                <label class="block text-xs font-medium text-slate-400 mb-2">CSV Data Source</label>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <div class="bg-slate-950 border border-slate-800 rounded-lg p-3">
+                                        <label class="block text-xs font-medium text-slate-300 mb-2">Upload CSV File</label>
+                                        <input type="file" id="bt_csv_file" accept=".csv" class="w-full text-xs text-slate-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-medium file:bg-indigo-600 file:text-white hover:file:bg-indigo-500 file:cursor-pointer">
+                                    </div>
+                                    <div class="bg-slate-950 border border-slate-800 rounded-lg p-3 relative" id="customDropdownContainer">
+                                        <label class="block text-xs font-medium text-slate-300 mb-2">Or Pick from Downloads</label>
+                                        <div class="relative">
+                                            <!-- The visible input that acts as the trigger and search box -->
+                                            <input type="text" id="bt_csv_select_display" placeholder="-- Select or type a file --" class="w-full bg-slate-900 border border-slate-700 rounded-md px-3 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500 cursor-pointer pr-8" autocomplete="off" onclick="toggleDropdown()" oninput="filterDropdown()">
+                                            <div class="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                                                <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                                            </div>
+                                            <!-- The actual hidden value submitted -->
+                                            <input type="hidden" id="bt_csv_select">
+                                            
+                                            <!-- The dropdown menu -->
+                                            <div id="bt_csv_dropdown" class="hidden absolute z-50 w-full mt-1 bg-slate-800 border border-slate-700 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                                                <ul id="bt_csv_list" class="py-1 text-xs text-white">
+                                                    <!-- Items populated via JS -->
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Strategy Parameters -->
+                            <div class="md:col-span-2 mt-2">
+                                <div class="flex items-center gap-4 mb-3">
+                                    <h3 class="text-sm font-semibold text-white">Strategy</h3>
+                                    <select id="bt_strategy" class="w-64 bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" onchange="toggleStrategyParams()">
+                                        <option value="EMA_WPR">EMA Crossover + WPR</option>
+                                        <option value="EMA_SIMPLE">Simple EMA Crossover</option>
+                                        <option value="RSI_MR">RSI Mean Reversion</option>
+                                        <option value="MACD_TF">MACD Trend Following</option>
+                                        <option value="BB_BREAKOUT">Bollinger Band Breakout</option>
+                                    </select>
+                                </div>
+                                <div class="grid grid-cols-1 md:grid-cols-5 gap-4" id="strategy_params_container">
+                                    <div>
+                                        <label class="block text-xs font-medium text-slate-400 mb-1">Timeframe</label>
+                                        <select id="bt_timeframe" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500">
+                                            <option value="1">1 Minute</option>
+                                            <option value="5">5 Minutes</option>
+                                            <option value="15">15 Minutes</option>
+                                            <option value="60">60 Minutes</option>
+                                            <option value="DAY" selected>Daily</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-slate-400 mb-1">Initial Capital</label>
+                                        <input type="number" id="bt_capital" value="100000" min="100" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-slate-400 mb-1">Quantity per Trade</label>
+                                        <input type="number" id="bt_qty" value="1" min="1" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500">
+                                    </div>
+                                    
+                                    <div class="param-ema-fast">
+                                        <label class="block text-xs font-medium text-slate-400 mb-1">EMA Fast Period</label>
+                                        <input type="number" id="bt_ema_fast" value="5" min="2" max="200" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500">
+                                    </div>
+                                    <div class="param-ema-mid">
+                                        <label class="block text-xs font-medium text-slate-400 mb-1">EMA Mid (or MACD Slow)</label>
+                                        <input type="number" id="bt_ema_mid" value="15" min="2" max="200" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500">
+                                    </div>
+                                    <div class="param-ema-slow">
+                                        <label class="block text-xs font-medium text-slate-400 mb-1">EMA Slow Period</label>
+                                        <input type="number" id="bt_ema_slow" value="50" min="2" max="500" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500">
+                                    </div>
+                                    <div class="param-wpr">
+                                        <label class="block text-xs font-medium text-slate-400 mb-1">Williams %R Period</label>
+                                        <input type="number" id="bt_wpr" value="70" min="2" max="500" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500">
+                                    </div>
+                                    <div class="param-rsi hidden">
+                                        <label class="block text-xs font-medium text-slate-400 mb-1">RSI Period</label>
+                                        <input type="number" id="bt_rsi" value="14" min="2" max="100" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500">
+                                    </div>
+                                    <div class="param-bb hidden">
+                                        <label class="block text-xs font-medium text-slate-400 mb-1">BB Period</label>
+                                        <input type="number" id="bt_bb" value="20" min="2" max="200" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Exit Conditions -->
+                            <div class="md:col-span-2 mt-1">
+                                <div class="border-t border-slate-800 pt-4 mt-1">
+                                    <h3 class="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+                                        <svg class="w-4 h-4 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                                        Exit Conditions
+                                    </h3>
+                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div>
+                                            <label class="block text-xs font-medium text-slate-400 mb-1">Stop Loss %</label>
+                                            <input type="number" id="bt_sl" value="2" min="0.1" max="50" step="0.1" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500">
+                                            <span class="text-xs text-slate-500 mt-0.5 block">Exit if price drops by this %</span>
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-medium text-slate-400 mb-1">Target %</label>
+                                            <input type="number" id="bt_target" value="4" min="0.1" max="100" step="0.1" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500">
+                                            <span class="text-xs text-slate-500 mt-0.5 block">Exit if price rises by this %</span>
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-medium text-slate-400 mb-1">Trailing Stop %</label>
+                                            <input type="number" id="bt_trailing" value="0" min="0" max="50" step="0.1" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500">
+                                            <span class="text-xs text-slate-500 mt-0.5 block">0 = disabled. Trails from peak</span>
+                                        </div>
+                                    </div>
+                                    <p class="text-xs text-slate-500 mt-3">Exits trigger on: Target hit, Stop Loss hit, Trailing Stop hit, OR dynamic indicator reversal (EMA trend break / WPR threshold).</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button id="backtestBtn" onclick="runBacktest()" class="w-full md:w-auto bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium px-6 py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            <span>Run Backtest</span>
+                            <svg id="btSpinner" class="animate-spin h-4 w-4 text-white hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                             </svg>
                         </button>
                     </div>
-                </div>
-            </div>
 
-            <!-- Results Panel -->
-            <div class="lg:col-span-2">
-                <div id="startupAlert" class="hidden mb-6 rounded-xl border border-indigo-500/40 bg-indigo-500/10 px-4 py-3 items-center gap-3">
-                    <span class="px-2 py-0.5 rounded-md bg-indigo-500 text-white text-xs font-bold mr-2">STARTUP</span>
-                    <span id="startupText" class="text-indigo-200 text-sm"></span>
-                </div>
-                
-                <div class="bg-slate-900 border border-slate-800 rounded-xl shadow-xl overflow-hidden">
-                    <div class="p-6 border-b border-slate-800 flex justify-between items-center">
-                        <h2 class="text-lg font-semibold text-white">Scan Results</h2>
-                        <span id="scanTime" class="text-xs text-slate-400"></span>
+                    <!-- Backtest Error -->
+                    <div id="btError" class="hidden rounded-xl border border-rose-500/30 bg-rose-500/10 p-4 mb-6">
+                        <div class="flex items-center gap-2">
+                            <svg class="w-5 h-5 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            <span id="btErrorText" class="text-rose-300 text-sm"></span>
+                        </div>
                     </div>
-                    
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-sm text-left">
-                            <thead class="text-xs text-slate-400 uppercase bg-slate-950/50">
-                                <tr>
-                                    <th class="px-6 py-3 font-semibold">Symbol</th>
-                                    <th class="px-6 py-3 font-semibold text-right">LTP</th>
-                                    <th class="px-6 py-3 font-semibold text-right">EMA5</th>
-                                    <th class="px-6 py-3 font-semibold text-right">EMA15</th>
-                                    <th class="px-6 py-3 font-semibold text-right">EMA50</th>
-                                    <th class="px-6 py-3 font-semibold text-right">WPR70</th>
-                                    <th class="px-6 py-3 font-semibold text-center">Signal</th>
-                                </tr>
-                            </thead>
-                            <tbody id="resultsBody" class="divide-y divide-slate-800/50">
-                                <tr>
-                                    <td colspan="7" class="px-6 py-12 text-center text-slate-500">
-                                        Enter your credentials and click <b>Run Scan</b> to fetch live data.
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
+
+                    <!-- Backtest Results -->
+                    <div id="btResults" class="hidden space-y-6">
+                        <!-- Summary Stats -->
+                        <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+                            <div class="stat-card rounded-xl p-4 text-center">
+                                <div class="text-xs text-slate-400 mb-1">Total Trades</div>
+                                <div id="bt_total" class="text-2xl font-bold text-white">0</div>
+                            </div>
+                            <div class="stat-card rounded-xl p-4 text-center">
+                                <div class="text-xs text-slate-400 mb-1">Win Rate</div>
+                                <div id="bt_winrate" class="text-2xl font-bold text-white">0%</div>
+                            </div>
+                            <div class="stat-card rounded-xl p-4 text-center">
+                                <div class="text-xs text-slate-400 mb-1">Total P&L</div>
+                                <div id="bt_pnl" class="text-2xl font-bold text-white">0%</div>
+                            </div>
+                            <div class="stat-card rounded-xl p-4 text-center">
+                                <div class="text-xs text-slate-400 mb-1">Max Drawdown</div>
+                                <div id="bt_dd" class="text-2xl font-bold text-white">0%</div>
+                            </div>
+                            <div class="stat-card rounded-xl p-4 text-center">
+                                <div class="text-xs text-slate-400 mb-1">Avg Bars Held</div>
+                                <div id="bt_avgbars" class="text-2xl font-bold text-white">0</div>
+                            </div>
+                        </div>
+
+                        <!-- Equity Curve -->
+                        <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl">
+                            <h3 class="text-sm font-semibold text-white mb-3">Equity Curve (Cumulative P&L %)</h3>
+                            <div class="relative" style="height: 280px;">
+                                <canvas id="equityChart"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- Trade Log -->
+                        <div class="bg-slate-900 border border-slate-800 rounded-xl shadow-xl overflow-hidden">
+                            <div class="p-5 border-b border-slate-800">
+                                <h3 class="text-sm font-semibold text-white">Trade Log</h3>
+                            </div>
+                            <div class="overflow-x-auto max-h-80">
+                                <table class="w-full text-sm text-left">
+                                    <thead class="text-xs text-slate-400 uppercase bg-slate-950/50 sticky top-0">
+                                        <tr>
+                                            <th class="px-4 py-2.5 font-semibold">#</th>
+                                            <th class="px-4 py-2.5 font-semibold">Symbol</th>
+                                            <th class="px-4 py-2.5 font-semibold">Entry Date</th>
+                                            <th class="px-4 py-2.5 font-semibold">Exit Date</th>
+                                            <th class="px-4 py-2.5 font-semibold text-right">Entry ₹</th>
+                                            <th class="px-4 py-2.5 font-semibold text-right">Exit ₹</th>
+                                            <th class="px-4 py-2.5 font-semibold text-right">P&L %</th>
+                                            <th class="px-4 py-2.5 font-semibold text-center">Exit Reason</th>
+                                            <th class="px-4 py-2.5 font-semibold text-right">Bars</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="tradeLogBody" class="divide-y divide-slate-800/50"></tbody>
+                                </table>
+                            </div>
+                        </div>
                     </div>
                 </div>
+
+                <!-- ==================== NEWS TAB ==================== -->
+                <div id="tab-news" class="tab-content">
+                    <div class="bg-slate-900 border border-slate-800 rounded-xl shadow-xl overflow-hidden mb-6">
+                        <div class="p-5 border-b border-slate-800 flex justify-between items-center bg-indigo-600/10">
+                            <h2 class="text-lg font-semibold text-white flex items-center gap-2">
+                                <svg class="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"/></svg>
+                                Market News & AI Sentiment
+                            </h2>
+                            <button id="newsBtn" onclick="fetchNews()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors flex items-center gap-2">
+                                <span>Fetch Latest News</span>
+                                <svg id="newsSpinner" class="animate-spin h-4 w-4 text-white hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="p-5">
+                            <div id="newsError" class="hidden rounded-xl border border-rose-500/30 bg-rose-500/10 p-4 mb-4">
+                                <div class="flex items-center gap-2">
+                                    <svg class="w-5 h-5 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                    <span id="newsErrorText" class="text-rose-300 text-sm"></span>
+                                </div>
+                            </div>
+                            
+                            <div id="newsGrid" class="grid grid-cols-1 gap-4">
+                                <div class="p-10 text-center text-slate-500 border border-dashed border-slate-700 rounded-xl">
+                                    Click "Fetch Latest News" to scan top stocks and generate AI sentiment. (Requires Gemini API Key)
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
             </div>
-            
         </div>
     </div>
 
     <script>
-        // Pre-fill from localStorage for convenience
+        // ---- Init ----
         document.getElementById('client_id').value = localStorage.getItem('dhan_client_id') || '';
         document.getElementById('access_token').value = localStorage.getItem('dhan_access_token') || '';
         document.getElementById('tg_bot').value = localStorage.getItem('tg_bot') || '';
         document.getElementById('tg_chat').value = localStorage.getItem('tg_chat') || '';
 
+        // Default dates to 1 year span
+        const today = new Date();
+        const lastYear = new Date();
+        lastYear.setFullYear(today.getFullYear() - 1);
+        document.getElementById('hist_to').value = today.toISOString().split('T')[0];
+        document.getElementById('hist_from').value = lastYear.toISOString().split('T')[0];
+
+        const BASE = window.location.pathname.replace(/\/?$/, '/');
+        let allSymbols = [];
+        let equityChartInstance = null;
+
+        // ---- Tab switching ----
+        function switchTab(tabId, btn) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => { b.classList.remove('active'); b.classList.add('text-slate-400'); });
+            document.getElementById('tab-' + tabId).classList.add('active');
+            btn.classList.add('active');
+            btn.classList.remove('text-slate-400');
+
+            if (tabId === 'backtest') loadDownloadsList();
+        }
+
+        function saveCreds() {
+            localStorage.setItem('dhan_client_id', document.getElementById('client_id').value);
+            localStorage.setItem('dhan_access_token', document.getElementById('access_token').value);
+            localStorage.setItem('tg_bot', document.getElementById('tg_bot').value);
+            localStorage.setItem('tg_chat', document.getElementById('tg_chat').value);
+        }
+
+        function getCreds() {
+            return {
+                client_id: document.getElementById('client_id').value,
+                access_token: document.getElementById('access_token').value,
+            };
+        }
+
+        function showGlobalError(msg) {
+            document.getElementById('globalStatus').classList.remove('hidden');
+            document.getElementById('globalStatusText').textContent = msg;
+        }
+        function hideGlobalError() {
+            document.getElementById('globalStatus').classList.add('hidden');
+        }
+
+        // ==================== HOME TAB ====================
         async function runScan() {
             const btn = document.getElementById('runBtn');
             const spinner = document.getElementById('spinner');
             const tbody = document.getElementById('resultsBody');
-            const badge = document.getElementById('statusBadge');
-            const statusText = document.getElementById('statusText');
             
-            const clientId = document.getElementById('client_id').value;
-            const accessToken = document.getElementById('access_token').value;
-            const tgBot = document.getElementById('tg_bot').value;
-            const tgChat = document.getElementById('tg_chat').value;
-
-            if(!clientId || !accessToken) {
-                badge.classList.remove('hidden');
-                statusText.textContent = 'Client ID and Access Token are required.';
+            const creds = getCreds();
+            if (!creds.client_id || !creds.access_token) {
+                showGlobalError('Client ID and Access Token are required.');
                 return;
             }
+            hideGlobalError();
+            saveCreds();
 
-            // Save to localStorage
-            localStorage.setItem('dhan_client_id', clientId);
-            localStorage.setItem('dhan_access_token', accessToken);
-            localStorage.setItem('tg_bot', tgBot);
-            localStorage.setItem('tg_chat', tgChat);
-
-            const startupAlert = document.getElementById('startupAlert');
-            
-            badge.classList.add('hidden');
-            startupAlert.classList.add('hidden');
             btn.disabled = true;
             spinner.classList.remove('hidden');
-            tbody.innerHTML = '<tr><td colspan="7" class="px-6 py-12 text-center text-slate-400">Scanning in progress... This may take a moment.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" class="px-5 py-10 text-center text-slate-400">Scanning in progress...</td></tr>';
 
-            const base = window.location.pathname.replace(/\/?$/, '/');
-            
             try {
-                const res = await fetch(base + 'scan', {
+                const res = await fetch(BASE + 'scan', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        client_id: clientId,
-                        access_token: accessToken,
-                        tg_bot: tgBot,
-                        tg_chat: tgChat
+                        client_id: creds.client_id,
+                        access_token: creds.access_token,
+                        tg_bot: document.getElementById('tg_bot').value,
+                        tg_chat: document.getElementById('tg_chat').value
                     })
                 });
-                
                 const data = await res.json();
-                
                 if (data.status === 'error') {
-                    badge.classList.remove('hidden');
-                    statusText.textContent = data.message;
-                    tbody.innerHTML = '<tr><td colspan="7" class="px-6 py-12 text-center text-slate-500">Scan failed.</td></tr>';
+                    showGlobalError(data.message);
+                    tbody.innerHTML = '<tr><td colspan="7" class="px-5 py-10 text-center text-slate-500">Scan failed.</td></tr>';
                 } else {
                     if (data.startup_msg) {
-                        startupAlert.classList.remove('hidden');
+                        const sa = document.getElementById('startupAlert');
+                        sa.classList.remove('hidden');
                         document.getElementById('startupText').textContent = data.startup_msg;
                     }
                     renderResults(data.results);
                 }
             } catch (err) {
-                badge.classList.remove('hidden');
-                statusText.textContent = 'Network error or server unreachable.';
-                tbody.innerHTML = '<tr><td colspan="7" class="px-6 py-12 text-center text-slate-500">Scan failed.</td></tr>';
+                showGlobalError('Network error or server unreachable.');
+                tbody.innerHTML = '<tr><td colspan="7" class="px-5 py-10 text-center text-slate-500">Scan failed.</td></tr>';
             } finally {
                 btn.disabled = false;
                 spinner.classList.add('hidden');
@@ -198,45 +580,429 @@
         function renderResults(results) {
             const tbody = document.getElementById('resultsBody');
             tbody.innerHTML = '';
-            
-            // Sort: Bullish/Bearish first, then Neutral, then Errors
             const rank = r => r.status === 'ERROR' ? 3 : (r.signal === 'NEUTRAL' ? 2 : (r.signal === 'BULLISH' ? 0 : 1));
             results.sort((a, b) => rank(a) - rank(b));
-            
             document.getElementById('scanTime').textContent = "Last scan: " + new Date().toLocaleTimeString();
 
             results.forEach(r => {
                 const tr = document.createElement('tr');
                 tr.className = 'hover:bg-slate-800/20 transition-colors';
-                
                 if (r.status === 'ERROR') {
-                    tr.innerHTML = `
-                        <td class="px-6 py-4 font-medium">${r.symbol}</td>
-                        <td colspan="6" class="px-6 py-4 text-amber-400 text-right text-xs">${r.message}</td>
-                    `;
+                    tr.innerHTML = `<td class="px-5 py-3.5 font-medium">${r.symbol}</td><td colspan="6" class="px-5 py-3.5 text-amber-400 text-right text-xs">${r.message}</td>`;
                 } else {
                     let sigHtml = `<span class="px-2.5 py-1 rounded-full text-xs font-medium bg-slate-700/40 text-slate-400">NEUTRAL</span>`;
-                    if (r.signal === 'BULLISH') {
-                        sigHtml = `<span class="px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/15 text-emerald-400">BULLISH</span>`;
-                    } else if (r.signal === 'BEARISH') {
-                        sigHtml = `<span class="px-2.5 py-1 rounded-full text-xs font-medium bg-rose-500/15 text-rose-400">BEARISH</span>`;
-                    }
-
+                    if (r.signal === 'BULLISH') sigHtml = `<span class="px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/15 text-emerald-400">BULLISH</span>`;
+                    else if (r.signal === 'BEARISH') sigHtml = `<span class="px-2.5 py-1 rounded-full text-xs font-medium bg-rose-500/15 text-rose-400">BEARISH</span>`;
                     tr.innerHTML = `
-                        <td class="px-6 py-4 font-medium text-white">${r.symbol}</td>
-                        <td class="px-6 py-4 text-right tabular-nums">${r.ltp.toFixed(2)}</td>
-                        <td class="px-6 py-4 text-right tabular-nums">${r.ema5.toFixed(2)}</td>
-                        <td class="px-6 py-4 text-right tabular-nums">${r.ema15.toFixed(2)}</td>
-                        <td class="px-6 py-4 text-right tabular-nums">${r.ema50.toFixed(2)}</td>
-                        <td class="px-6 py-4 text-right tabular-nums">${r.wpr70.toFixed(2)}</td>
-                        <td class="px-6 py-4 text-center">${sigHtml}</td>
+                        <td class="px-5 py-3.5 font-medium text-white">${r.symbol}</td>
+                        <td class="px-5 py-3.5 text-right tabular-nums">${r.ltp.toFixed(2)}</td>
+                        <td class="px-5 py-3.5 text-right tabular-nums">${r.ema5.toFixed(2)}</td>
+                        <td class="px-5 py-3.5 text-right tabular-nums">${r.ema15.toFixed(2)}</td>
+                        <td class="px-5 py-3.5 text-right tabular-nums">${r.ema50.toFixed(2)}</td>
+                        <td class="px-5 py-3.5 text-right tabular-nums">${r.wpr70.toFixed(2)}</td>
+                        <td class="px-5 py-3.5 text-center">${sigHtml}</td>
                     `;
                 }
                 tbody.appendChild(tr);
             });
-            
             if (results.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="7" class="px-6 py-12 text-center text-slate-500">Scan complete - no data returned.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="7" class="px-5 py-10 text-center text-slate-500">Scan complete - no data returned.</td></tr>';
+            }
+        }
+
+        // ==================== HISTORICAL DATA TAB ====================
+        let symbolSearchTimer = null;
+
+        async function searchSymbols(query) {
+            try {
+                const res = await fetch(BASE + 'symbols?q=' + encodeURIComponent(query));
+                const data = await res.json();
+                allSymbols = data.symbols;
+                
+                const datalist = document.getElementById('symbolList');
+                datalist.innerHTML = '';
+                allSymbols.forEach(s => {
+                    const opt = document.createElement('option');
+                    opt.value = s.symbol;
+                    opt.label = s.symbol + ' (' + s.exchange + ')';
+                    datalist.appendChild(opt);
+                });
+                document.getElementById('hist_symbol_count').textContent = allSymbols.length + (allSymbols.length >= 50 ? '+' : '') + ' matches';
+            } catch (err) {
+                document.getElementById('hist_symbol_count').textContent = 'Search failed';
+            }
+        }
+
+        // Debounced search + exchange badge on symbol input
+        document.getElementById('hist_symbol').addEventListener('input', function() {
+            const val = this.value.trim();
+            const badge = document.getElementById('hist_exchange_badge');
+            const match = allSymbols.find(s => s.symbol === val);
+            if (match) {
+                badge.textContent = match.exchange;
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
+
+            // Debounced search — fire after 250ms of no typing
+            clearTimeout(symbolSearchTimer);
+            if (val.length >= 1) {
+                symbolSearchTimer = setTimeout(() => searchSymbols(val), 250);
+            }
+        });
+
+        async function downloadHistorical() {
+            const btn = document.getElementById('downloadBtn');
+            const spinner = document.getElementById('histSpinner');
+            const resultDiv = document.getElementById('histResult');
+            const errorDiv = document.getElementById('histError');
+            
+            const creds = getCreds();
+            const symbol = document.getElementById('hist_symbol').value.trim();
+            if (!creds.client_id || !creds.access_token) {
+                showGlobalError('Client ID and Access Token are required.');
+                return;
+            }
+            if (!symbol) {
+                errorDiv.classList.remove('hidden');
+                resultDiv.classList.add('hidden');
+                document.getElementById('histErrorText').textContent = 'Please enter a symbol.';
+                return;
+            }
+            hideGlobalError();
+            saveCreds();
+
+            btn.disabled = true;
+            spinner.classList.remove('hidden');
+            resultDiv.classList.add('hidden');
+            errorDiv.classList.add('hidden');
+
+            try {
+                const res = await fetch(BASE + 'historical', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        client_id: creds.client_id,
+                        access_token: creds.access_token,
+                        symbol: symbol,
+                        from_date: document.getElementById('hist_from').value,
+                        to_date: document.getElementById('hist_to').value,
+                        timeframe: document.getElementById('hist_timeframe').value,
+                    })
+                });
+                const data = await res.json();
+                if (data.status === 'error') {
+                    errorDiv.classList.remove('hidden');
+                    document.getElementById('histErrorText').textContent = data.message;
+                } else {
+                    resultDiv.classList.remove('hidden');
+                    document.getElementById('histResultText').textContent = 
+                        `Saved ${data.rows.toLocaleString()} rows to downloads/${data.filename} (Exchange: ${data.exchange})`;
+                }
+            } catch (err) {
+                errorDiv.classList.remove('hidden');
+                document.getElementById('histErrorText').textContent = 'Network error or server unreachable.';
+            } finally {
+                btn.disabled = false;
+                spinner.classList.add('hidden');
+            }
+        }
+
+        
+        async function fetchNews() {
+            const btn = document.getElementById("newsBtn");
+            const spinner = document.getElementById("newsSpinner");
+            const errorDiv = document.getElementById("newsError");
+            const errorText = document.getElementById("newsErrorText");
+            const grid = document.getElementById("newsGrid");
+            
+            errorDiv.classList.add("hidden");
+            btn.disabled = true;
+            spinner.classList.remove("hidden");
+            
+            grid.innerHTML = '<div class="p-10 text-center text-slate-500">Fetching live market news and generating AI sentiment...</div>';
+            
+            try {
+                const payload = {
+                    gemini_key: document.getElementById("gemini_key").value,
+                    client_id: document.getElementById("client_id").value,
+                    access_token: document.getElementById("access_token").value
+                };
+                const res = await fetch("/api/news", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (data.status === "error") throw new Error(data.message);
+                
+                grid.innerHTML = "";
+                data.news.forEach(item => {
+                    let color = "slate";
+                    if (item.indicator === "BULLISH") color = "emerald";
+                    if (item.indicator === "BEARISH") color = "rose";
+                    
+                    const li = document.createElement("div");
+                    li.className = `p-4 rounded-xl border border-${color}-500/30 bg-${color}-500/10`;
+                    
+                    let htmlStr = `<div class="flex justify-between items-start mb-3">
+                        <div>
+                            <h3 class="text-lg font-bold text-white">${item.symbol}</h3>
+                            <div class="text-sm text-slate-400">LTP: ₹${item.ltp > 0 ? item.ltp : 'N/A'}</div>
+                        </div>
+                        <div class="px-3 py-1 rounded-full text-xs font-bold bg-${color}-500/20 text-${color}-400 border border-${color}-500/30">
+                            ${item.indicator}
+                        </div>
+                    </div>
+                    <div class="mb-3 text-sm text-${color}-200 bg-slate-950/50 p-3 rounded border border-slate-800">
+                        <span class="font-semibold block mb-1 text-slate-400">Gemini AI Analysis:</span>
+                        ${item.sentiment}
+                    </div>
+                    <ul class="list-disc pl-5 text-xs text-slate-400 space-y-1">`;
+                    
+                    item.headlines.forEach(h => {
+                        htmlStr += `<li>${h}</li>`;
+                    });
+                    htmlStr += `</ul></div>`;
+                    li.innerHTML = htmlStr;
+                    grid.appendChild(li);
+                });
+                
+            } catch(err) {
+                errorText.textContent = err.message;
+                errorDiv.classList.remove("hidden");
+                grid.innerHTML = '';
+            } finally {
+                btn.disabled = false;
+                spinner.classList.add("hidden");
+            }
+        }
+    
+        function toggleStrategyParams() {
+            const strategy = document.getElementById('bt_strategy').value;
+            const container = document.getElementById('strategy_params_container');
+            
+            // Hide all first
+            container.querySelectorAll('div[class^="param-"]').forEach(el => el.classList.add('hidden'));
+            
+            if (strategy === 'EMA_WPR') {
+                container.querySelector('.param-ema-fast').classList.remove('hidden');
+                container.querySelector('.param-ema-mid').classList.remove('hidden');
+                container.querySelector('.param-ema-slow').classList.remove('hidden');
+                container.querySelector('.param-wpr').classList.remove('hidden');
+            } else if (strategy === 'EMA_SIMPLE') {
+                container.querySelector('.param-ema-fast').classList.remove('hidden');
+                container.querySelector('.param-ema-mid').classList.remove('hidden');
+            } else if (strategy === 'RSI_MR') {
+                container.querySelector('.param-rsi').classList.remove('hidden');
+            } else if (strategy === 'MACD_TF') {
+                container.querySelector('.param-ema-fast').classList.remove('hidden');
+                container.querySelector('.param-ema-mid').classList.remove('hidden');
+            } else if (strategy === 'BB_BREAKOUT') {
+                container.querySelector('.param-bb').classList.remove('hidden');
+            }
+        }
+
+        async function loadDownloadsList() {
+            try {
+                const res = await fetch(BASE + 'downloads');
+                const data = await res.json();
+                const datalist = document.getElementById('file-list');
+                datalist.innerHTML = '';
+                data.files.forEach(f => {
+                    const opt = document.createElement('option');
+                    opt.value = f.filename;
+                    datalist.appendChild(opt);
+                });
+            } catch (err) {
+                console.error('Failed to load downloads list:', err);
+            }
+        }
+
+        // Clear file input when dropdown is used and vice versa
+        document.getElementById('bt_csv_select').addEventListener('change', function() {
+            if (this.value) {
+                document.getElementById('bt_csv_file').value = '';
+                const tfSelect = document.getElementById('bt_timeframe');
+                for (let i = 0; i < tfSelect.options.length; i++) {
+                    const optVal = tfSelect.options[i].value;
+                    if (this.value.includes('_' + optVal + '_') || this.value.includes('_' + optVal + '.')) {
+                        tfSelect.selectedIndex = i;
+                        break;
+                    }
+                }
+            }
+        });
+        document.getElementById('bt_csv_file').addEventListener('change', function() {
+            if (this.files.length) document.getElementById('bt_csv_select').value = '';
+        });
+
+        async function runBacktest() {
+            const btn = document.getElementById('backtestBtn');
+            const spinner = document.getElementById('btSpinner');
+            const errorDiv = document.getElementById('btError');
+            const resultsDiv = document.getElementById('btResults');
+
+            errorDiv.classList.add('hidden');
+            resultsDiv.classList.add('hidden');
+
+            const formData = new FormData();
+            formData.append('strategy_name', document.getElementById('bt_strategy').value);
+            formData.append('timeframe', document.getElementById('bt_timeframe').value);
+            formData.append('initial_capital', document.getElementById('bt_capital').value);
+            formData.append('quantity_per_trade', document.getElementById('bt_qty').value);
+            formData.append('ema_fast', document.getElementById('bt_ema_fast').value);
+            formData.append('ema_mid', document.getElementById('bt_ema_mid').value);
+            formData.append('ema_slow', document.getElementById('bt_ema_slow').value);
+            formData.append('wpr_period', document.getElementById('bt_wpr').value);
+            formData.append('rsi_period', document.getElementById('bt_rsi').value);
+            formData.append('bb_period', document.getElementById('bt_bb').value);
+            formData.append('stop_loss_pct', document.getElementById('bt_sl').value);
+            formData.append('target_pct', document.getElementById('bt_target').value);
+            formData.append('trailing_stop_pct', document.getElementById('bt_trailing').value);
+
+            const fileInput = document.getElementById('bt_csv_file');
+            const selectInput = document.getElementById('bt_csv_select');
+
+            if (fileInput.files.length > 0) {
+                formData.append('csv_file', fileInput.files[0]);
+            } else if (selectInput.value) {
+                formData.append('csv_filename', selectInput.value);
+            } else {
+                errorDiv.classList.remove('hidden');
+                document.getElementById('btErrorText').textContent = 'Please upload a CSV file or select one from downloads.';
+                return;
+            }
+
+            btn.disabled = true;
+            spinner.classList.remove('hidden');
+
+            try {
+                const res = await fetch(BASE + 'backtest', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
+                if (data.status === 'error') {
+                    errorDiv.classList.remove('hidden');
+                    document.getElementById('btErrorText').textContent = data.message;
+                } else {
+                    renderBacktestResults(data);
+                }
+            } catch (err) {
+                errorDiv.classList.remove('hidden');
+                document.getElementById('btErrorText').textContent = 'Network error or server unreachable.';
+            } finally {
+                btn.disabled = false;
+                spinner.classList.add('hidden');
+            }
+        }
+
+        function renderBacktestResults(data) {
+            const resultsDiv = document.getElementById('btResults');
+            resultsDiv.classList.remove('hidden');
+
+            const s = data.summary;
+            document.getElementById('bt_total').textContent = s.total_trades;
+            
+            const winEl = document.getElementById('bt_winrate');
+            winEl.textContent = s.win_rate + '%';
+            winEl.className = 'text-2xl font-bold ' + (s.win_rate >= 50 ? 'text-emerald-400' : 'text-rose-400');
+
+            const pnlEl = document.getElementById('bt_pnl');
+            pnlEl.textContent = (s.total_pnl_pct >= 0 ? '+' : '') + s.total_pnl_pct + '%';
+            pnlEl.className = 'text-2xl font-bold ' + (s.total_pnl_pct >= 0 ? 'text-emerald-400' : 'text-rose-400');
+
+            document.getElementById('bt_dd').textContent = s.max_drawdown_pct + '%';
+            document.getElementById('bt_dd').className = 'text-2xl font-bold text-amber-400';
+
+            document.getElementById('bt_avgbars').textContent = s.avg_bars_held;
+
+            let symbolText = "Stock";
+            if (data.symbol) {
+                symbolText = data.symbol;
+            }
+
+            // Equity curve chart
+            if (equityChartInstance) equityChartInstance.destroy();
+            const ctx = document.getElementById('equityChart').getContext('2d');
+            const isPositive = data.equity_curve[data.equity_curve.length - 1] >= 0;
+            equityChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.equity_curve.map((_, i) => i),
+                    datasets: [{
+                        label: 'Cumulative P&L %',
+                        data: data.equity_curve,
+                        borderColor: isPositive ? '#34d399' : '#fb7185',
+                        backgroundColor: isPositive ? 'rgba(52,211,153,0.08)' : 'rgba(251,113,133,0.08)',
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: data.equity_curve.length > 50 ? 0 : 3,
+                        pointHoverRadius: 5,
+                        borderWidth: 2,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: '#1e293b',
+                            borderColor: '#334155',
+                            borderWidth: 1,
+                            titleColor: '#f8fafc',
+                            bodyColor: '#cbd5e1',
+                            callbacks: {
+                                label: ctx => 'P&L: ' + ctx.parsed.y.toFixed(2) + '%',
+                                title: ctx => 'Trade #' + ctx[0].label,
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            display: true,
+                            title: { display: true, text: 'Trade #', color: '#64748b', font: { size: 11 } },
+                            ticks: { color: '#64748b', font: { size: 10 } },
+                            grid: { color: 'rgba(51,65,85,0.3)' },
+                        },
+                        y: {
+                            display: true,
+                            title: { display: true, text: 'Cumulative P&L %', color: '#64748b', font: { size: 11 } },
+                            ticks: { color: '#64748b', font: { size: 10 }, callback: v => v.toFixed(1) + '%' },
+                            grid: { color: 'rgba(51,65,85,0.3)' },
+                        }
+                    }
+                }
+            });
+
+            // Trade log table
+            const tbody = document.getElementById('tradeLogBody');
+            tbody.innerHTML = '';
+            data.trades.forEach((t, i) => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-800/20 transition-colors';
+                const pnlColor = t.pnl_pct >= 0 ? 'text-emerald-400' : 'text-rose-400';
+                const pnlPrefix = t.pnl_pct >= 0 ? '+' : '';
+                const reasonColors = {'SL': 'bg-rose-500/15 text-rose-400', 'TARGET': 'bg-emerald-500/15 text-emerald-400', 'TRAILING': 'bg-amber-500/15 text-amber-400', 'CROSSOVER': 'bg-indigo-500/15 text-indigo-400', 'FORCED': 'bg-slate-700/40 text-slate-400'};
+                const rc = reasonColors[t.exit_reason] || reasonColors['FORCED'];
+                tr.innerHTML = `
+                    <td class="px-4 py-2.5 text-slate-400">${i + 1}</td>
+                    <td class="px-4 py-2.5 text-white font-medium">${symbolText}</td>
+                    <td class="px-4 py-2.5 text-xs">${t.entry_date}</td>
+                    <td class="px-4 py-2.5 text-xs">${t.exit_date}</td>
+                    <td class="px-4 py-2.5 text-right tabular-nums">${t.entry_price.toFixed(2)}</td>
+                    <td class="px-4 py-2.5 text-right tabular-nums">${t.exit_price.toFixed(2)}</td>
+                    <td class="px-4 py-2.5 text-right tabular-nums font-medium ${pnlColor}">${pnlPrefix}${t.pnl_pct.toFixed(2)}%</td>
+                    <td class="px-4 py-2.5 text-center"><span class="px-2 py-0.5 rounded-full text-xs font-medium ${rc}">${t.exit_reason || '—'}</span></td>
+                    <td class="px-4 py-2.5 text-right tabular-nums text-slate-400">${t.bars_held}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+            if (data.trades.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="9" class="px-4 py-8 text-center text-slate-500">No trades were generated with these parameters.</td></tr>';
             }
         }
     </script>

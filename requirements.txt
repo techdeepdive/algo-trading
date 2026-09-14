@@ -3,3 +3,7 @@ Dhan-Tradehull
 pandas
 flask
 gunicorn
+google-genai
+numpy<2
+feedparser
+beautifulsoup4

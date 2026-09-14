@@ -1,17 +1,99 @@
-from flask import Flask, render_template, request, jsonify
+import os
+import glob
+import pandas as pd
+import requests
+import feedparser
+from bs4 import BeautifulSoup
+from google import genai
+from flask import Flask, render_template, request, jsonify, send_from_directory
 from scanner import run_scan
+from backtester import run_backtest
+from Dhan_Tradehull import Tradehull
 
 app = Flask(__name__)
+app.config['TEMPLATES_AUTO_RELOAD'] = True
+
+DOWNLOADS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "downloads")
+os.makedirs(DOWNLOADS_DIR, exist_ok=True)
+
+# ---- Cached instrument data ------------------------------------------------
+_symbol_cache = None
+
+def _load_symbols():
+    """Load symbol list from the Tradehull instrument CSV in Dependencies/."""
+    global _symbol_cache
+    if _symbol_cache is not None:
+        return _symbol_cache
+
+    dep_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Dependencies")
+    csvs = glob.glob(os.path.join(dep_dir, "all_instrument*.csv"))
+    if not csvs:
+        return []
+
+    # Use the most recent instrument file
+    csv_path = sorted(csvs)[-1]
+    df = pd.read_csv(csv_path, low_memory=False)
+
+    symbols = []
+
+    # INDEX instruments
+    idx = df[df['SEM_INSTRUMENT_NAME'] == 'INDEX']
+    for _, row in idx.iterrows():
+        sym = str(row['SEM_TRADING_SYMBOL']).strip()
+        if sym and sym != 'nan':
+            symbols.append({"symbol": sym, "exchange": "INDEX"})
+
+    # MCX commodity futures
+    mcx = df[(df['SEM_EXM_EXCH_ID'] == 'MCX') & (df['SEM_INSTRUMENT_NAME'].isin(['FUTCOM', 'FUTIDX']))]
+    mcx_names = set()
+    for _, row in mcx.iterrows():
+        name = str(row.get('SM_SYMBOL_NAME', '')).strip()
+        if name and name != 'nan' and name not in mcx_names:
+            mcx_names.add(name)
+            symbols.append({"symbol": name, "exchange": "MCX"})
+
+    # NSE equity
+    nse = df[(df['SEM_EXM_EXCH_ID'] == 'NSE') & (df['SEM_INSTRUMENT_NAME'] == 'EQUITY')]
+    nse_syms = set()
+    for _, row in nse.iterrows():
+        sym = str(row['SEM_TRADING_SYMBOL']).strip()
+        if sym and sym != 'nan' and sym not in nse_syms:
+            nse_syms.add(sym)
+            symbols.append({"symbol": sym, "exchange": "NSE"})
+
+    # BSE-only equity
+    bse = df[(df['SEM_EXM_EXCH_ID'] == 'BSE') & (df['SEM_INSTRUMENT_NAME'] == 'EQUITY')]
+    for _, row in bse.iterrows():
+        sym = str(row['SEM_TRADING_SYMBOL']).strip()
+        if sym and sym != 'nan' and sym not in nse_syms:
+            symbols.append({"symbol": sym, "exchange": "BSE"})
+
+    symbols.sort(key=lambda x: x["symbol"])
+    _symbol_cache = symbols
+    return symbols
+
+
+def _detect_exchange(symbol):
+    """Auto-detect exchange for a given symbol from the instrument file."""
+    symbols = _load_symbols()
+    for s in symbols:
+        if s["symbol"] == symbol:
+            return s["exchange"]
+    return "NSE"  # default fallback
+
+
+# ---- Routes ----------------------------------------------------------------
 
 @app.after_request
 def no_cache(resp):
-    # stop the browser serving stale HTML/JS between edits
     resp.headers["Cache-Control"] = "no-store"
     return resp
+
 
 @app.route("/")
 def index():
     return render_template("index.html")
+
 
 @app.route("/scan", methods=["POST"])
 def scan():
@@ -31,6 +113,252 @@ def scan():
         return jsonify(result), 400
         
     return jsonify(result)
+
+
+@app.route("/symbols")
+def symbols():
+    q = request.args.get("q", "").strip().upper()
+    syms = _load_symbols()
+    if q:
+        prefix = [s for s in syms if s["symbol"].startswith(q)]
+        if len(prefix) < 50:
+            contains = [s for s in syms if q in s["symbol"] and not s["symbol"].startswith(q)]
+            prefix.extend(contains[:50 - len(prefix)])
+        syms = prefix[:50]
+    else:
+        syms = syms[:50]
+    return jsonify({"symbols": syms})
+
+
+@app.route("/historical", methods=["POST"])
+def historical():
+    data = request.json
+    client_id = data.get("client_id")
+    access_token = data.get("access_token")
+    symbol = data.get("symbol", "").strip()
+    from_date = data.get("from_date", "").strip()
+    to_date = data.get("to_date", "").strip()
+    timeframe = data.get("timeframe", "DAY").strip()
+
+    if not client_id or not access_token:
+        return jsonify({"status": "error", "message": "Client ID and Access Token are required."}), 400
+    if not symbol:
+        return jsonify({"status": "error", "message": "Symbol is required."}), 400
+
+    exchange = _detect_exchange(symbol)
+
+    try:
+        tsl = Tradehull(client_id, access_token, mode="access_token")
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 400
+
+    try:
+        if from_date and to_date:
+            df = tsl.get_long_term_historical_data(
+                tradingsymbol=symbol, exchange=exchange, timeframe=timeframe,
+                from_date=from_date, to_date=to_date
+            )
+        else:
+            df = tsl.get_historical_data(
+                tradingsymbol=symbol, exchange=exchange, timeframe=timeframe
+            )
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 400
+
+    if df is None or len(df) == 0:
+        return jsonify({"status": "error", "message": "No data returned for this symbol/date range."}), 400
+
+    date_suffix = f"_{from_date}_{to_date}" if from_date and to_date else ""
+    filename = f"{symbol}_{exchange}_{timeframe}{date_suffix}.csv"
+    filepath = os.path.join(DOWNLOADS_DIR, filename)
+    df.to_csv(filepath, index=False)
+
+    return jsonify({
+        "status": "success",
+        "filename": filename,
+        "rows": len(df),
+        "columns": list(df.columns),
+        "exchange": exchange,
+    })
+
+
+@app.route("/downloads")
+def downloads():
+    files = []
+    if os.path.isdir(DOWNLOADS_DIR):
+        for f in sorted(os.listdir(DOWNLOADS_DIR)):
+            if f.endswith(".csv"):
+                fpath = os.path.join(DOWNLOADS_DIR, f)
+                size_kb = round(os.path.getsize(fpath) / 1024, 1)
+                files.append({"filename": f, "size_kb": size_kb})
+    return jsonify({"files": files})
+
+
+@app.route("/downloads/<filename>")
+def download_file(filename):
+    return send_from_directory(DOWNLOADS_DIR, filename, as_attachment=True)
+
+
+@app.route("/backtest", methods=["POST"])
+def backtest():
+    strategy_name = request.form.get("strategy_name", "EMA_WPR")
+    ema_fast = int(request.form.get("ema_fast", 5))
+    ema_mid = int(request.form.get("ema_mid", 15))
+    ema_slow = int(request.form.get("ema_slow", 50))
+    wpr_period = int(request.form.get("wpr_period", 70))
+    rsi_period = int(request.form.get("rsi_period", 14))
+    bb_period = int(request.form.get("bb_period", 20))
+    
+    initial_capital = float(request.form.get("initial_capital", 100000.0))
+    quantity_per_trade = int(request.form.get("quantity_per_trade", 1))
+
+    df = None
+    symbol = None
+
+    if "csv_file" in request.files and request.files["csv_file"].filename:
+        file = request.files["csv_file"]
+        try:
+            df = pd.read_csv(file)
+        except Exception as e:
+            return jsonify({"status": "error", "message": f"Failed to read CSV: {e}"}), 400
+
+    elif request.form.get("csv_filename"):
+        filename = request.form.get("csv_filename")
+        symbol = filename.split('_')[0] if '_' in filename else filename.split('.')[0]
+        filepath = os.path.join(DOWNLOADS_DIR, filename)
+        if not os.path.isfile(filepath):
+            return jsonify({"status": "error", "message": f"File not found: {filename}"}), 400
+        try:
+            df = pd.read_csv(filepath)
+        except Exception as e:
+            return jsonify({"status": "error", "message": f"Failed to read CSV: {e}"}), 400
+
+    if df is None:
+        return jsonify({"status": "error", "message": "No CSV provided. Upload a file or select from downloads."}), 400
+
+    required = {"open", "high", "low", "close"}
+    if not required.issubset(set(df.columns)):
+        return jsonify({"status": "error", "message": f"CSV must have columns: {required}. Found: {list(df.columns)}"}), 400
+
+    stop_loss_pct = float(request.form.get("stop_loss_pct", 2.0))
+    target_pct = float(request.form.get("target_pct", 4.0))
+    trailing_stop_pct = float(request.form.get("trailing_stop_pct", 0.0))
+    timeframe = request.form.get("timeframe", "DAY")
+
+    result = run_backtest(
+        df, 
+        strategy_name=strategy_name,
+        timeframe=timeframe,
+        ema_fast=ema_fast, 
+        ema_mid=ema_mid, 
+        ema_slow=ema_slow, 
+        wpr_period=wpr_period,
+        rsi_period=rsi_period,
+        bb_period=bb_period,
+        stop_loss_pct=stop_loss_pct,
+        target_pct=target_pct,
+        trailing_stop_pct=trailing_stop_pct,
+        initial_capital=initial_capital,
+        quantity_per_trade=quantity_per_trade
+    )
+    if symbol:
+        result["symbol"] = symbol
+
+    return jsonify(result)
+
+@app.route("/api/news", methods=["POST"])
+def api_news():
+    data = request.json
+    gemini_key = data.get("gemini_key")
+    client_id = data.get("client_id")
+    access_token = data.get("access_token")
+    
+    if not gemini_key:
+        return jsonify({"status": "error", "message": "Gemini API Key is required for News sentiment."}), 400
+        
+    try:
+        client = genai.Client(api_key=gemini_key)
+        # Using gemini-2.5-flash as default for the new API
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"Failed to init Gemini: {e}"}), 400
+        
+    tsl = None
+    if client_id and access_token:
+        try:
+            tsl = Tradehull(client_id, access_token, mode="access_token")
+        except:
+            pass
+
+    # Top Nifty stocks for demonstration
+    stocks = ["RELIANCE", "HDFCBANK", "TCS", "INFY", "ICICIBANK"]
+    
+    # We will use Yahoo Finance RSS feeds
+    results = []
+    
+    for symbol in stocks:
+        feed_url = f"https://feeds.finance.yahoo.com/rss/2.0/headline?s={symbol}.NS&region=IN&lang=en-IN"
+        try:
+            feed = feedparser.parse(feed_url)
+            
+            headlines = []
+            for entry in feed.entries[:3]:
+                # Extract clean text from description
+                soup = BeautifulSoup(entry.summary, "html.parser")
+                text = soup.get_text(strip=True)
+                headlines.append(f"{entry.title}: {text}")
+                
+            combined_news = "\\n".join(headlines)
+            
+            if not combined_news:
+                sentiment_analysis = "No recent news available."
+                indicator = "NEUTRAL"
+            else:
+                prompt = f"Analyze the following recent news for {symbol}:\\n{combined_news}\\n\\nBased purely on this news, provide a strict ONE WORD indicator (BULLISH, BEARISH, or NEUTRAL) followed by a | character, and then a 1-sentence justification."
+                
+                try:
+                    response = client.models.generate_content(
+                        model='gemini-3.6-flash',
+                        contents=prompt
+                    )
+                    ai_res = response.text
+                    parts = ai_res.split('|')
+                    if len(parts) >= 2:
+                        indicator = parts[0].strip().upper()
+                        sentiment_analysis = parts[1].strip()
+                    else:
+                        indicator = "NEUTRAL"
+                        sentiment_analysis = ai_res.strip()
+                except Exception as e:
+                    indicator = "ERROR"
+                    sentiment_analysis = f"Gemini API Error: {str(e)}"
+            
+            ltp = 0.0
+            try:
+                headers = {'User-Agent': 'Mozilla/5.0'}
+                res = requests.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}.NS", headers=headers, timeout=3)
+                if res.status_code == 200:
+                    ltp = float(res.json()["chart"]["result"][0]["meta"]["regularMarketPrice"])
+            except:
+                pass
+                
+            results.append({
+                "symbol": symbol,
+                "ltp": ltp,
+                "indicator": indicator,
+                "sentiment": sentiment_analysis,
+                "headlines": [h.split(':')[0] for h in headlines] # Just titles for UI
+            })
+            
+        except Exception as e:
+            results.append({
+                "symbol": symbol,
+                "ltp": 0.0,
+                "indicator": "ERROR",
+                "sentiment": str(e),
+                "headlines": []
+            })
+            
+    return jsonify({"status": "success", "news": results})
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5001, debug=False)
