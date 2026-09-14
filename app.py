@@ -209,7 +209,7 @@ def historical():
                         filenames.append(filename)
                         columns = list(df.columns)
                 except Exception as inner_e:
-                    print(f"Error fetching strike {s}: {inner_e}")
+                    print(f"[historical] Error fetching strike {s} — skipping.")
                     continue
             
             if len(filenames) == 0:

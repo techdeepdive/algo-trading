@@ -65,7 +65,7 @@ def run_scan(client_id, access_token, tg_bot=None, tg_chat=None):
             tsl.send_telegram_alert(startup_msg, tg_chat, tg_bot)
         except Exception as e:
             startup_msg = f"Failed to retrieve balance/positions from Dhan: {str(e)}"
-            print(f"Failed to send startup message: {e}")
+            print("[scanner] Failed to send Telegram startup message.")
 
     symbols = [("RELIANCE", "NSE"), ("TCS", "NSE"), ("CRUDEOIL", "MCX"), ("GOLD", "MCX")]
     results = []
@@ -89,7 +89,7 @@ def run_scan(client_id, access_token, tg_bot=None, tg_chat=None):
             try:
                 tsl.send_telegram_alert(msg, tg_chat, tg_bot)
             except Exception as e:
-                print(f"Telegram alert failed: {e}")
+                print("[scanner] Telegram alert failed.")
                 
         results.append({
             "symbol": sym,
