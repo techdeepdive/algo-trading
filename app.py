@@ -159,7 +159,8 @@ def historical():
     if not symbol:
         return jsonify({"status": "error", "message": "Symbol is required."}), 400
 
-    exchange = _detect_exchange(symbol)
+    exchange_override = data.get("exchange")  # Optional manual override from UI
+    exchange = exchange_override if exchange_override else _detect_exchange(symbol)
 
     try:
         tsl = Tradehull(client_id, access_token, mode="access_token")

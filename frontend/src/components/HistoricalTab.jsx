@@ -4,6 +4,7 @@ import { Download, Loader2, Info } from 'lucide-react';
 export default function HistoricalTab({ credentials }) {
   const [assetType, setAssetType] = useState('equity'); // 'equity' | 'options'
   const [symbol, setSymbol] = useState('');
+  const [exchange, setExchange] = useState('AUTO');
   
   // Options specific state
   const [optionType, setOptionType] = useState('CALL');
@@ -63,6 +64,7 @@ export default function HistoricalTab({ credentials }) {
           from_date: fromDate,
           to_date: toDate,
           timeframe,
+          exchange: exchange === 'AUTO' ? undefined : exchange,
           option_type: optionType,
           expiry_flag: expiryFlag,
           expiry_code: expiryCode,
@@ -107,22 +109,38 @@ export default function HistoricalTab({ credentials }) {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
         
         {assetType === 'equity' ? (
-          <div className="lg:col-span-2">
-              <label className="block text-xs font-medium text-slate-400 mb-1">Stock / Future Symbol *</label>
-              <input 
-                type="text" 
-                list="symbols_list"
-                value={symbol}
-                onChange={(e) => setSymbol(e.target.value.toUpperCase())}
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" 
-                placeholder="e.g. RELIANCE, NIFTY, CRUDEOIL, GOLD" 
-              />
-              <datalist id="symbols_list">
-                {symbolsList.map((s, i) => (
-                  <option key={i} value={s.symbol}>{s.exchange}</option>
-                ))}
-              </datalist>
-          </div>
+          <>
+            <div className="lg:col-span-2">
+                <label className="block text-xs font-medium text-slate-400 mb-1">Stock / Future Symbol *</label>
+                <input 
+                  type="text" 
+                  list="symbols_list"
+                  value={symbol}
+                  onChange={(e) => setSymbol(e.target.value.toUpperCase())}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" 
+                  placeholder="e.g. RELIANCE, NIFTY, CRUDEOIL, GOLD" 
+                />
+                <datalist id="symbols_list">
+                  {symbolsList.map((s, i) => (
+                    <option key={i} value={s.symbol}>{s.exchange}</option>
+                  ))}
+                </datalist>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-400 mb-1">Exchange *</label>
+              <select
+                value={exchange}
+                onChange={(e) => setExchange(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+              >
+                <option value="AUTO">Auto Detect</option>
+                <option value="NSE">NSE (Stocks)</option>
+                <option value="BSE">BSE (Stocks)</option>
+                <option value="MCX">MCX (Commodities)</option>
+                <option value="INDEX">INDEX (Nifty/Sensex)</option>
+              </select>
+            </div>
+          </>
         ) : (
           <>
             <div className="lg:col-span-1">
