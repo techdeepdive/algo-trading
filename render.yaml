@@ -2,5 +2,5 @@ services:
   - type: web
     name: algo-trading
     runtime: python
-    buildCommand: pip install -r requirements.txt && cd frontend && npm install && npm run build
+    buildCommand: pip install -r requirements.txt
     startCommand: gunicorn app:app --workers 2 --bind 0.0.0.0:$PORT --timeout 120
