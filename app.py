@@ -10,6 +10,13 @@ from scanner import run_scan
 from backtester import run_backtest
 from Dhan_Tradehull import Tradehull
 
+# Load .env for local development (Render injects env vars directly)
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 app = Flask(__name__, static_folder='frontend/dist', static_url_path='/')
 PORT = int(os.environ.get("PORT", 5001))
 
