@@ -10,7 +10,15 @@ from scanner import run_scan
 from backtester import run_backtest
 from Dhan_Tradehull import Tradehull
 
+# Load .env for local development (Render injects env vars directly)
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 app = Flask(__name__, static_folder='frontend/dist', static_url_path='/')
+PORT = int(os.environ.get("PORT", 5001))
 
 DOWNLOADS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "downloads")
 os.makedirs(DOWNLOADS_DIR, exist_ok=True)
@@ -432,4 +440,4 @@ def api_news():
     return jsonify({"status": "success", "news": results})
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5001, debug=False)
+    app.run(host="0.0.0.0", port=PORT, debug=False)
