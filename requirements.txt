@@ -1,4 +1,4 @@
-﻿dhanhq
+dhanhq
 Dhan-Tradehull
 pandas
 flask
@@ -8,5 +8,4 @@ numpy<2
 feedparser
 beautifulsoup4
 requests
-python-dotenv
 
