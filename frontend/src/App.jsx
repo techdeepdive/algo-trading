@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Home, Clock, Activity, Newspaper } from 'lucide-react';
+import { Home, Clock, Activity, Newspaper, ShieldCheck } from 'lucide-react';
 import HomeTab from './components/HomeTab';
 import HistoricalTab from './components/HistoricalTab';
 import BacktestTab from './components/BacktestTab';
+import HedgingTab from './components/HedgingTab';
 import NewsTab from './components/NewsTab';
 
 function App() {
@@ -32,6 +33,7 @@ function App() {
     { id: 'home', label: 'Home', icon: Home },
     { id: 'historical', label: 'Historical Data', icon: Clock },
     { id: 'backtest', label: 'Backtesting', icon: Activity },
+    { id: 'hedging', label: 'Hedging', icon: ShieldCheck },
     { id: 'news', label: 'Market News (AI)', icon: Newspaper },
   ];
 
@@ -103,6 +105,7 @@ function App() {
           {activeTab === 'home' && <HomeTab credentials={credentials} />}
           {activeTab === 'historical' && <HistoricalTab credentials={credentials} />}
           {activeTab === 'backtest' && <BacktestTab credentials={credentials} />}
+          {activeTab === 'hedging' && <HedgingTab credentials={credentials} />}
           {activeTab === 'news' && <NewsTab credentials={credentials} />}
         </div>
       </div>

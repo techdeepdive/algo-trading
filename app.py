@@ -5,10 +5,11 @@ import requests
 import feedparser
 from bs4 import BeautifulSoup
 from google import genai
-from flask import Flask, render_template, request, jsonify, send_from_directory
+from flask import Flask, render_template, request, jsonify, send_from_directory, Response
 from scanner import run_scan
 from backtester import run_backtest
 from Dhan_Tradehull import Tradehull
+from hedging_backtester import get_strategy_payoff, run_hedging_backtest, run_hedging_backtest_from_csv
 
 # Load .env for local development (Render injects env vars directly)
 try:
@@ -274,6 +275,174 @@ def downloads():
 @app.route("/downloads/<filename>")
 def download_file(filename):
     return send_from_directory(DOWNLOADS_DIR, filename, as_attachment=True)
+
+
+@app.route("/simulate_hedging", methods=["POST"])
+def simulate_hedging():
+    data = request.json
+    client_id = data.get("client_id")
+    access_token = data.get("access_token")
+    symbol = data.get("symbol")
+    strategy = data.get("strategy")
+    exchange = data.get("exchange", "INDEX")
+
+    try:
+        tsl = Tradehull(client_id, access_token, mode="access_token")
+        result = get_strategy_payoff(tsl, symbol, exchange, strategy)
+        return jsonify({"status": "success", "data": result})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 400
+
+
+@app.route("/backtest_hedging", methods=["POST"])
+def backtest_hedging():
+    # Support both JSON (API data) and FormData (CSV upload)
+    if request.is_json:
+        data = request.json
+    else:
+        data = request.form
+
+    strategy = data.get("strategy")
+    slippage = float(data.get("slippage", 0.0))
+    capital = float(data.get("capital", 100000))
+    qty_multiplier = int(data.get("qty_multiplier", 1))
+    sl_pct = float(data.get("sl_pct", 0.0))
+    tp_pct = float(data.get("tp_pct", 0.0))
+
+    try:
+        # Check if individual leg files were uploaded
+        if "file_leg1" in request.files and request.files["file_leg1"].filename:
+            dataframes = []
+            leg_idx = 1
+            while f"file_leg{leg_idx}" in request.files and request.files[f"file_leg{leg_idx}"].filename:
+                file = request.files[f"file_leg{leg_idx}"]
+                df_leg = pd.read_csv(file)
+                
+                # Find datetime col
+                dt_col = None
+                for col in ['start_Time', 'datetime', 'Date', 'date', 'time', 'Timestamp', 'timestamp']:
+                    if col in df_leg.columns:
+                        dt_col = col
+                        break
+                if not dt_col:
+                    raise ValueError(f"CSV for Leg {leg_idx} missing a valid datetime column.")
+                
+                # Find price col
+                price_col = None
+                for col in ['close', 'Close', 'price', 'LTP']:
+                    if col in df_leg.columns:
+                        price_col = col
+                        break
+                if not price_col:
+                    raise ValueError(f"CSV for Leg {leg_idx} missing a valid price column (e.g. 'close').")
+                
+                # Standardize
+                cols_to_keep = [dt_col, price_col]
+                rename_dict = {price_col: f'leg{leg_idx}'}
+                for opt_col in ['iv', 'spot', 'strike']:
+                    if opt_col in df_leg.columns:
+                        cols_to_keep.append(opt_col)
+                        rename_dict[opt_col] = f'{opt_col}_{leg_idx-1}' # 0-indexed for backtester
+                        
+                df_leg = df_leg[cols_to_keep].rename(columns=rename_dict)
+                df_leg[dt_col] = pd.to_datetime(df_leg[dt_col])
+                
+                dataframes.append(df_leg)
+                leg_idx += 1
+                
+            # Merge all legs on datetime
+            merged_df = dataframes[0]
+            dt_col_name = merged_df.columns[0] # The datetime column name
+            for df_leg in dataframes[1:]:
+                dt_col_next = df_leg.columns[0]
+                # Ensure same column name for merge
+                df_leg = df_leg.rename(columns={dt_col_next: dt_col_name})
+                merged_df = pd.merge(merged_df, df_leg, on=dt_col_name, how='inner')
+                
+            if merged_df.empty:
+                raise ValueError("No overlapping timestamps found across the uploaded CSV files.")
+                
+            result = run_hedging_backtest_from_csv(merged_df, strategy, slippage, capital, qty_multiplier, sl_pct, tp_pct)
+
+        elif "csv_file" in request.files and request.files["csv_file"].filename:
+            file = request.files["csv_file"]
+            df = pd.read_csv(file)
+            result = run_hedging_backtest_from_csv(df, strategy, slippage, capital, qty_multiplier, sl_pct, tp_pct)
+        else:
+            client_id = data.get("client_id")
+            access_token = data.get("access_token")
+            symbol = data.get("symbol")
+            expiry_flag = data.get("expiry_flag", "WEEK")
+            from_date = data.get("from_date")
+            to_date = data.get("to_date")
+            timeframe = data.get("timeframe", "15")
+            exchange = data.get("exchange", "INDEX")
+
+            tsl = Tradehull(client_id, access_token, mode="access_token")
+            result = run_hedging_backtest(tsl, symbol, exchange, strategy, expiry_flag, from_date, to_date, timeframe, slippage, capital, qty_multiplier, sl_pct, tp_pct)
+            
+        return jsonify({"status": "success", "data": result})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 400
+
+
+@app.route("/download_leg_csv", methods=["POST"])
+def download_leg_csv():
+    data = request.json
+    client_id = data.get("client_id")
+    access_token = data.get("access_token")
+    symbol = data.get("symbol")
+    strategy = data.get("strategy")
+    leg_index = int(data.get("leg_index"))
+    expiry_flag = data.get("expiry_flag", "WEEK")
+    from_date = data.get("from_date")
+    to_date = data.get("to_date")
+    timeframe = data.get("timeframe", "15")
+    exchange = data.get("exchange", "INDEX")
+
+    try:
+        tsl = Tradehull(client_id, access_token, mode="access_token")
+        from hedging_backtester import STRATEGIES
+        if strategy not in STRATEGIES:
+            return jsonify({"status": "error", "message": "Invalid strategy"}), 400
+        
+        legs = STRATEGIES[strategy]
+        if leg_index < 0 or leg_index >= len(legs):
+            return jsonify({"status": "error", "message": "Invalid leg index"}), 400
+            
+        opt_type, offset, action, qty = legs[leg_index]
+        if offset == 0:
+            strike_str = "ATM"
+        else:
+            strike_str = f"ATM+{offset}" if opt_type == "CALL" else f"ATM-{offset}"
+            
+        tf_int = int(timeframe.split()[0])
+        
+        df = tsl.get_expired_option_data(
+            tradingsymbol=symbol, 
+            exchange=exchange,
+            interval=tf_int,
+            expiry_flag=expiry_flag,
+            expiry_code=1,
+            strike=strike_str,
+            option_type=opt_type,
+            from_date=from_date,
+            to_date=to_date
+        )
+        
+        if df is None or df.empty:
+            return jsonify({"status": "error", "message": f"No data returned for Leg {leg_index+1} ({opt_type} {strike_str})"}), 404
+            
+        csv_data = df.to_csv(index=False)
+        filename = f"{symbol}_{strategy.replace(' ', '_')}_Leg{leg_index+1}_{opt_type}_{strike_str}_{from_date}_to_{to_date}.csv"
+        
+        return Response(
+            csv_data,
+            mimetype="text/csv",
+            headers={"Content-disposition": f"attachment; filename={filename}"}
+        )
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 400
 
 
 @app.route("/backtest", methods=["POST"])
