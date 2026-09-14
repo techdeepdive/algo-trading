@@ -10,8 +10,7 @@ from scanner import run_scan
 from backtester import run_backtest
 from Dhan_Tradehull import Tradehull
 
-app = Flask(__name__)
-app.config['TEMPLATES_AUTO_RELOAD'] = True
+app = Flask(__name__, static_folder='frontend/dist', static_url_path='/')
 
 DOWNLOADS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "downloads")
 os.makedirs(DOWNLOADS_DIR, exist_ok=True)
@@ -92,7 +91,7 @@ def no_cache(resp):
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return app.send_static_file("index.html")
 
 
 @app.route("/scan", methods=["POST"])
@@ -139,6 +138,12 @@ def historical():
     from_date = data.get("from_date", "").strip()
     to_date = data.get("to_date", "").strip()
     timeframe = data.get("timeframe", "DAY").strip()
+    
+    asset_type = data.get("asset_type", "equity")
+    expiry_flag = data.get("expiry_flag", "WEEK")
+    expiry_code = int(data.get("expiry_code", 1))
+    strike = data.get("strike", "ATM")
+    option_type = data.get("option_type", "CALL")
 
     if not client_id or not access_token:
         return jsonify({"status": "error", "message": "Client ID and Access Token are required."}), 400
@@ -153,33 +158,95 @@ def historical():
         return jsonify({"status": "error", "message": str(e)}), 400
 
     try:
-        if from_date and to_date:
-            df = tsl.get_long_term_historical_data(
-                tradingsymbol=symbol, exchange=exchange, timeframe=timeframe,
-                from_date=from_date, to_date=to_date
-            )
+        if asset_type == "options":
+            # For options, Tradehull uses integer timeframes for minutes (1, 5, 15, 60, DAY)
+            tf_int = timeframe if timeframe == "DAY" else int(timeframe)
+            
+            # Parse strike range
+            strikes_to_fetch = [strike]
+            if "_" in strike:
+                # e.g. ATM_1 means ATM-1, ATM, ATM+1
+                offset = int(strike.split("_")[1])
+                strikes_to_fetch = ["ATM"]
+                for i in range(1, offset + 1):
+                    strikes_to_fetch.append(f"ATM+{i}")
+                    strikes_to_fetch.append(f"ATM-{i}")
+
+            total_rows = 0
+            filenames = []
+            columns = []
+            
+            for s in strikes_to_fetch:
+                try:
+                    df = tsl.get_expired_option_data(
+                        tradingsymbol=symbol, 
+                        exchange="NSE" if exchange == "NSE" else "INDEX",
+                        interval=tf_int,
+                        expiry_flag=expiry_flag,
+                        expiry_code=expiry_code,
+                        strike=s,
+                        option_type=option_type,
+                        from_date=from_date,
+                        to_date=to_date
+                    )
+                    
+                    if df is not None and len(df) > 0:
+                        s_clean = s.replace("+", "_PLUS_").replace("-", "_MINUS_")
+                        filename = f"{symbol}_{s_clean}_{option_type}_{expiry_flag}_{timeframe}_{from_date}_{to_date}.csv"
+                        filepath = os.path.join(DOWNLOADS_DIR, filename)
+                        df.to_csv(filepath, index=False)
+                        
+                        total_rows += len(df)
+                        filenames.append(filename)
+                        columns = list(df.columns)
+                except Exception as inner_e:
+                    print(f"Error fetching strike {s}: {inner_e}")
+                    continue
+            
+            if len(filenames) == 0:
+                return jsonify({"status": "error", "message": "No data returned for any strike in the range."}), 400
+
+            return jsonify({
+                "status": "success",
+                "filename": ", ".join(filenames),
+                "rows": total_rows,
+                "columns": columns,
+                "exchange": exchange,
+            })
+
         else:
-            df = tsl.get_historical_data(
-                tradingsymbol=symbol, exchange=exchange, timeframe=timeframe
-            )
+            if from_date and to_date:
+                df = tsl.get_long_term_historical_data(
+                    tradingsymbol=symbol, exchange=exchange, timeframe=timeframe,
+                    from_date=from_date, to_date=to_date
+                )
+            else:
+                df = tsl.get_historical_data(
+                    tradingsymbol=symbol, exchange=exchange, timeframe=timeframe
+                )
+            date_suffix = f"_{from_date}_{to_date}" if from_date and to_date else ""
+            filename = f"{symbol}_{exchange}_{timeframe}{date_suffix}.csv"
+            
+            if df is None or len(df) == 0:
+                return jsonify({"status": "error", "message": "No data returned for this symbol/date range."}), 400
+
+            filepath = os.path.join(DOWNLOADS_DIR, filename)
+            df.to_csv(filepath, index=False)
+
+            return jsonify({
+                "status": "success",
+                "filename": filename,
+                "rows": len(df),
+                "columns": list(df.columns),
+                "exchange": exchange,
+            })
+            
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 400
 
-    if df is None or len(df) == 0:
-        return jsonify({"status": "error", "message": "No data returned for this symbol/date range."}), 400
 
-    date_suffix = f"_{from_date}_{to_date}" if from_date and to_date else ""
-    filename = f"{symbol}_{exchange}_{timeframe}{date_suffix}.csv"
-    filepath = os.path.join(DOWNLOADS_DIR, filename)
-    df.to_csv(filepath, index=False)
 
-    return jsonify({
-        "status": "success",
-        "filename": filename,
-        "rows": len(df),
-        "columns": list(df.columns),
-        "exchange": exchange,
-    })
+
 
 
 @app.route("/downloads")
@@ -208,6 +275,7 @@ def backtest():
     wpr_period = int(request.form.get("wpr_period", 70))
     rsi_period = int(request.form.get("rsi_period", 14))
     bb_period = int(request.form.get("bb_period", 20))
+    oi_spike_pct = float(request.form.get("oi_spike_pct", 10.0))
     
     initial_capital = float(request.form.get("initial_capital", 100000.0))
     quantity_per_trade = int(request.form.get("quantity_per_trade", 1))
@@ -244,6 +312,7 @@ def backtest():
     target_pct = float(request.form.get("target_pct", 4.0))
     trailing_stop_pct = float(request.form.get("trailing_stop_pct", 0.0))
     timeframe = request.form.get("timeframe", "DAY")
+    slippage_pct = float(request.form.get("slippage_pct", 0.1))
 
     result = run_backtest(
         df, 
@@ -255,9 +324,11 @@ def backtest():
         wpr_period=wpr_period,
         rsi_period=rsi_period,
         bb_period=bb_period,
+        oi_spike_pct=oi_spike_pct,
         stop_loss_pct=stop_loss_pct,
         target_pct=target_pct,
         trailing_stop_pct=trailing_stop_pct,
+        slippage_pct=slippage_pct,
         initial_capital=initial_capital,
         quantity_per_trade=quantity_per_trade
     )

@@ -6,8 +6,8 @@ Supports multiple strategies, Long-Only trades, and Pyramiding based on Capital.
 import pandas as pd
 
 def run_backtest(df, strategy_name="EMA_WPR", timeframe="DAY", 
-                 ema_fast=5, ema_mid=15, ema_slow=50, wpr_period=70, rsi_period=14, bb_period=20,
-                 stop_loss_pct=2.0, target_pct=4.0, trailing_stop_pct=0.0,
+                 ema_fast=5, ema_mid=15, ema_slow=50, wpr_period=70, rsi_period=14, bb_period=20, oi_spike_pct=10,
+                 stop_loss_pct=2.0, target_pct=4.0, trailing_stop_pct=0.0, slippage_pct=0.1,
                  initial_capital=100000.0, quantity_per_trade=1):
     """Run backtest on a DataFrame with OHLCV data.
     
@@ -18,6 +18,15 @@ def run_backtest(df, strategy_name="EMA_WPR", timeframe="DAY",
 
     df = df.copy()
     
+    # Standardize datetime format for entry/exit logs
+    if 'timestamp' in df.columns:
+        # Convert to datetime and then to string format for consistency
+        df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce').dt.strftime('%Y-%m-%d %H:%M:%S')
+    elif 'start_Time' in df.columns:
+        df['timestamp'] = pd.to_datetime(df['start_Time'], errors='coerce').dt.strftime('%Y-%m-%d %H:%M:%S')
+    elif 'date' in df.columns:
+        df['timestamp'] = pd.to_datetime(df['date'], errors='coerce').dt.strftime('%Y-%m-%d %H:%M:%S')
+        
     # Pre-compute indicators based on strategy
     if strategy_name == "EMA_WPR" or strategy_name == "EMA_SIMPLE":
         df['EMA_fast'] = df['close'].ewm(span=ema_fast, adjust=False).mean()
@@ -46,6 +55,14 @@ def run_backtest(df, strategy_name="EMA_WPR", timeframe="DAY",
         df['BB_std'] = df['close'].rolling(window=bb_period).std()
         df['BB_upper'] = df['BB_mid'] + (2 * df['BB_std'])
         df['BB_lower'] = df['BB_mid'] - (2 * df['BB_std'])
+        
+    elif strategy_name == "OI_BREAKOUT":
+        if 'oi' in df.columns or 'open_interest' in df.columns:
+            oi_col = 'oi' if 'oi' in df.columns else 'open_interest'
+            # Calculate % change in OI
+            df['OI_pct_change'] = df[oi_col].pct_change() * 100
+        else:
+            return {"status": "error", "message": "OI (Open Interest) data is missing in the CSV for this strategy."}
 
     trades = []
     equity_curve_pnl = [0.0]  # Tracks cumulative total P&L in %
@@ -89,6 +106,14 @@ def run_backtest(df, strategy_name="EMA_WPR", timeframe="DAY",
         elif strategy_name == "BB_BREAKOUT":
             bullish_entry = (pc['close'] <= pc['BB_upper'] and rc['close'] > rc['BB_upper'])
             long_indicator_exit = (rc['close'] < rc['BB_mid'])
+            
+        elif strategy_name == "OI_BREAKOUT":
+            # OI Spike AND Price Breakout (close > previous high)
+            oi_spike = rc.get('OI_pct_change', 0) > oi_spike_pct
+            price_breakout = rc['close'] > pc['high']
+            bullish_entry = oi_spike and price_breakout
+            # Exit if price drops below previous candle's low
+            long_indicator_exit = rc['close'] < pc['low']
 
         # --- Execution Logic ---
         next_open = float(df.iloc[i + 1]['open'])
@@ -121,6 +146,9 @@ def run_backtest(df, strategy_name="EMA_WPR", timeframe="DAY",
                 exit_reason = 'TRAILING'
                 
             if exit_reason:
+                # Apply slippage (selling lower)
+                exit_price = exit_price * (1 - slippage_pct / 100.0)
+                
                 pnl_abs = (exit_price - pos["entry_price"]) * pos["quantity"]
                 pnl_pct = ((exit_price - pos["entry_price"]) / pos["entry_price"]) * 100
                 
@@ -149,22 +177,24 @@ def run_backtest(df, strategy_name="EMA_WPR", timeframe="DAY",
 
         # 2. Check for New Entries
         if bullish_entry:
-            required_capital = next_open * quantity_per_trade
+            # Apply slippage (buying higher)
+            entry_price = next_open * (1 + slippage_pct / 100.0)
+            required_capital = entry_price * quantity_per_trade
             if available_capital >= required_capital:
                 available_capital -= required_capital
                 active_positions.append({
-                    "entry_price": next_open,
+                    "entry_price": entry_price,
                     "entry_date": next_ts,
                     "entry_idx": i + 1,
                     "quantity": quantity_per_trade,
                     "capital_used": required_capital,
-                    "highest_high": next_open
+                    "highest_high": entry_price
                 })
 
     # Close any open positions at the end of data
     for pos in active_positions:
         rc = df.iloc[-1]
-        exit_price = float(rc['close'])
+        exit_price = float(rc['close']) * (1 - slippage_pct / 100.0)
         
         pnl_abs = (exit_price - pos["entry_price"]) * pos["quantity"]
         pnl_pct = ((exit_price - pos["entry_price"]) / pos["entry_price"]) * 100
