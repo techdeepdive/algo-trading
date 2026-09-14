@@ -75,7 +75,18 @@ export default function HistoricalTab({ credentials }) {
       if (data.status === 'error') {
         setError(data.message);
       } else {
-        setSuccess(`Saved ${data.rows} rows to downloads/${data.filename}`);
+        setSuccess(`Downloaded ${data.rows} rows.`);
+        
+        // Trigger local browser download for each generated file
+        const filenames = data.filename.split(', ');
+        filenames.forEach(file => {
+          const a = document.createElement('a');
+          a.href = `/downloads/${encodeURIComponent(file)}`;
+          a.download = file;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        });
       }
     } catch (e) {
       setError('Network error or server unreachable.');
