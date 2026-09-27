@@ -3,6 +3,8 @@ import threading
 import time
 from datetime import datetime, timezone, timedelta
 import pandas as pd
+import requests
+import os
 from Dhan_Tradehull import Tradehull
 import logging
 
@@ -179,6 +181,21 @@ def scanner_loop(client_id, access_token, tg_bot=None, tg_chat=None, strategy_na
         
     symbols_to_scan = list(symbols_to_scan)
     
+    # Pre-download the instrument master to bypass Render/Cloudflare blocking default Python User-Agents
+    csv_file = 'api-scrip-master.csv'
+    if not os.path.exists(csv_file) or os.path.getsize(csv_file) < 1000:
+        logger.info(f"Downloading {csv_file} with custom User-Agent...")
+        try:
+            url = 'https://images.dhan.co/api-data/api-scrip-master.csv'
+            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+            response = requests.get(url, headers=headers, timeout=15)
+            response.raise_for_status()
+            with open(csv_file, 'wb') as f:
+                f.write(response.content)
+            logger.info("Successfully downloaded instrument master.")
+        except Exception as e:
+            logger.error(f"Failed to download instrument master: {e}")
+
     try:
         tsl = Tradehull(client_id, access_token, mode="access_token")
     except Exception as e:
