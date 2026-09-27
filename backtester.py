@@ -8,7 +8,7 @@ import pandas as pd
 def run_backtest(df, strategy_name="EMA_WPR", timeframe="DAY", 
                  ema_fast=5, ema_mid=15, ema_slow=50, wpr_period=70, rsi_period=14, bb_period=20, oi_spike_pct=10,
                  stop_loss_pct=2.0, target_pct=4.0, trailing_stop_pct=0.0, slippage_pct=0.1,
-                 initial_capital=100000.0, quantity_per_trade=1):
+                 initial_capital=100000.0, quantity_per_trade=1, trade_direction="BOTH"):
     """Run backtest on a DataFrame with OHLCV data.
     
     Returns dict with summary stats, trade log, and equity curve.
@@ -28,10 +28,10 @@ def run_backtest(df, strategy_name="EMA_WPR", timeframe="DAY",
         df['timestamp'] = pd.to_datetime(df['date'], errors='coerce').dt.strftime('%Y-%m-%d %H:%M:%S')
         
     # Pre-compute indicators based on strategy
-    if strategy_name == "EMA_WPR" or strategy_name == "EMA_SIMPLE":
+    if strategy_name in ["EMA_WPR", "EMA_SIMPLE", "WPR_CROSS_EMA"]:
         df['EMA_fast'] = df['close'].ewm(span=ema_fast, adjust=False).mean()
         df['EMA_mid']  = df['close'].ewm(span=ema_mid, adjust=False).mean()
-        if strategy_name == "EMA_WPR":
+        if strategy_name in ["EMA_WPR", "WPR_CROSS_EMA"]:
             df['EMA_slow'] = df['close'].ewm(span=ema_slow, adjust=False).mean()
             hh = df['high'].rolling(wpr_period).max()
             ll = df['low'].rolling(wpr_period).min()
@@ -75,14 +75,22 @@ def run_backtest(df, strategy_name="EMA_WPR", timeframe="DAY",
     if start_idx >= len(df):
          return {"status": "error", "message": f"Not enough data. Need at least {start_idx} candles."}
 
+    # State variables for WPR_CROSS_EMA strategy
+    wpr_long_armed = False
+    wpr_short_armed = False
+    
+    max_capital_utilized = 0.0
+
     for i in range(start_idx, len(df) - 1):
         rc = df.iloc[i]      # current candle
         pc = df.iloc[i - 1]  # previous candle
         
         long_indicator_exit = False
+        short_indicator_exit = False
         bullish_entry = False
+        bearish_entry = False
 
-        # --- Strategy Logic (LONG ONLY) ---
+        # --- Strategy Logic ---
         if strategy_name == "EMA_WPR":
             bullish_entry = (
                 (pc['EMA_fast'] <= pc['EMA_mid'] and rc['EMA_fast'] > rc['EMA_mid'])
@@ -115,6 +123,27 @@ def run_backtest(df, strategy_name="EMA_WPR", timeframe="DAY",
             # Exit if price drops below previous candle's low
             long_indicator_exit = rc['close'] < pc['low']
 
+        elif strategy_name == "WPR_CROSS_EMA":
+            # Arm conditions
+            if rc['WPR'] < -70:
+                wpr_long_armed = True
+                wpr_short_armed = False
+            elif rc['WPR'] > -20:
+                wpr_short_armed = True
+                wpr_long_armed = False
+                
+            # Entry conditions (Wait for the EMA crossover and one candle close at the crossover)
+            # The cross is confirmed on the close of 'rc'
+            if wpr_long_armed and (pc['EMA_fast'] <= pc['EMA_mid'] and rc['EMA_fast'] > rc['EMA_mid']):
+                bullish_entry = True
+                wpr_long_armed = False # Reset after entry
+                
+            if wpr_short_armed and (pc['EMA_fast'] >= pc['EMA_mid'] and rc['EMA_fast'] < rc['EMA_mid']):
+                bearish_entry = True
+                wpr_short_armed = False # Reset after entry
+            
+            # No indicator exits requested by user; rely solely on SL/TP.
+
         # --- Execution Logic ---
         next_open = float(df.iloc[i + 1]['open'])
         next_ts = str(df.iloc[i + 1]['timestamp']) if 'timestamp' in df.columns else str(i + 1)
@@ -124,33 +153,59 @@ def run_backtest(df, strategy_name="EMA_WPR", timeframe="DAY",
         for pos in active_positions:
             if rc['high'] > pos["highest_high"]:
                 pos["highest_high"] = rc['high']
+            if rc['low'] < pos["lowest_low"]:
+                pos["lowest_low"] = rc['low']
                 
-            sl_price = pos["entry_price"] * (1 - stop_loss_pct / 100.0)
-            tp_price = pos["entry_price"] * (1 + target_pct / 100.0)
-            ts_price = pos["highest_high"] * (1 - trailing_stop_pct / 100.0) if trailing_stop_pct > 0 else 0
-            
             exit_price = None
             exit_reason = None
             
-            if long_indicator_exit:
-                exit_price = next_open
-                exit_reason = 'INDICATOR'
-            elif rc['low'] <= sl_price:
-                exit_price = min(sl_price, rc['open']) # use worst price
-                exit_reason = 'SL'
-            elif rc['high'] >= tp_price:
-                exit_price = max(tp_price, rc['open'])
-                exit_reason = 'TARGET'
-            elif trailing_stop_pct > 0 and rc['low'] <= ts_price:
-                exit_price = min(ts_price, rc['open'])
-                exit_reason = 'TRAILING'
+            if pos["type"] == "LONG":
+                sl_price = pos["entry_price"] * (1 - stop_loss_pct / 100.0)
+                tp_price = pos["entry_price"] * (1 + target_pct / 100.0)
+                ts_price = pos["highest_high"] * (1 - trailing_stop_pct / 100.0) if trailing_stop_pct > 0 else 0
+                
+                if long_indicator_exit:
+                    exit_price = next_open
+                    exit_reason = 'INDICATOR'
+                elif rc['low'] <= sl_price:
+                    exit_price = min(sl_price, rc['open']) # use worst price
+                    exit_reason = 'SL'
+                elif rc['high'] >= tp_price:
+                    exit_price = max(tp_price, rc['open'])
+                    exit_reason = 'TARGET'
+                elif trailing_stop_pct > 0 and rc['low'] <= ts_price:
+                    exit_price = min(ts_price, rc['open'])
+                    exit_reason = 'TRAILING'
+            
+            else: # SHORT
+                sl_price = pos["entry_price"] * (1 + stop_loss_pct / 100.0)
+                tp_price = pos["entry_price"] * (1 - target_pct / 100.0)
+                ts_price = pos["lowest_low"] * (1 + trailing_stop_pct / 100.0) if trailing_stop_pct > 0 else float('inf')
+                
+                if short_indicator_exit:
+                    exit_price = next_open
+                    exit_reason = 'INDICATOR'
+                elif rc['high'] >= sl_price:
+                    exit_price = max(sl_price, rc['open']) # use worst price
+                    exit_reason = 'SL'
+                elif rc['low'] <= tp_price:
+                    exit_price = min(tp_price, rc['open'])
+                    exit_reason = 'TARGET'
+                elif trailing_stop_pct > 0 and rc['high'] >= ts_price:
+                    exit_price = max(ts_price, rc['open'])
+                    exit_reason = 'TRAILING'
                 
             if exit_reason:
-                # Apply slippage (selling lower)
-                exit_price = exit_price * (1 - slippage_pct / 100.0)
-                
-                pnl_abs = (exit_price - pos["entry_price"]) * pos["quantity"]
-                pnl_pct = ((exit_price - pos["entry_price"]) / pos["entry_price"]) * 100
+                if pos["type"] == "LONG":
+                    # Apply slippage (selling lower)
+                    exit_price = exit_price * (1 - slippage_pct / 100.0)
+                    pnl_abs = (exit_price - pos["entry_price"]) * pos["quantity"]
+                    pnl_pct = ((exit_price - pos["entry_price"]) / pos["entry_price"]) * 100
+                else: # SHORT
+                    # Apply slippage (buying higher to cover)
+                    exit_price = exit_price * (1 + slippage_pct / 100.0)
+                    pnl_abs = (pos["entry_price"] - exit_price) * pos["quantity"]
+                    pnl_pct = ((pos["entry_price"] - exit_price) / pos["entry_price"]) * 100
                 
                 # Release capital and add PnL
                 available_capital += pos["capital_used"] + pnl_abs
@@ -158,6 +213,7 @@ def run_backtest(df, strategy_name="EMA_WPR", timeframe="DAY",
                 trades.append({
                     "entry_date": pos["entry_date"],
                     "exit_date": next_ts if 'INDICATOR' in exit_reason else (str(rc['timestamp']) if 'timestamp' in df.columns else str(i)),
+                    "type": pos["type"],
                     "entry_price": round(pos["entry_price"], 2),
                     "exit_price": round(exit_price, 2),
                     "pnl_pct": round(pnl_pct, 2),
@@ -175,35 +231,60 @@ def run_backtest(df, strategy_name="EMA_WPR", timeframe="DAY",
                 
         active_positions = remaining_positions
 
+        # Apply trade direction filter
+        if trade_direction == "LONG":
+            bearish_entry = False
+        elif trade_direction == "SHORT":
+            bullish_entry = False
+            
         # 2. Check for New Entries
-        if bullish_entry:
-            # Apply slippage (buying higher)
-            entry_price = next_open * (1 + slippage_pct / 100.0)
+        if bullish_entry or bearish_entry:
+            # Apply slippage
+            if bullish_entry:
+                entry_price = next_open * (1 + slippage_pct / 100.0)
+                trade_type = "LONG"
+            else:
+                entry_price = next_open * (1 - slippage_pct / 100.0)
+                trade_type = "SHORT"
+                
             required_capital = entry_price * quantity_per_trade
             if available_capital >= required_capital:
                 available_capital -= required_capital
                 active_positions.append({
+                    "type": trade_type,
                     "entry_price": entry_price,
                     "entry_date": next_ts,
                     "entry_idx": i + 1,
                     "quantity": quantity_per_trade,
                     "capital_used": required_capital,
-                    "highest_high": entry_price
+                    "highest_high": entry_price,
+                    "lowest_low": entry_price
                 })
+                
+                # Track max capital used
+                current_capital_used = initial_capital - available_capital
+                if current_capital_used > max_capital_utilized:
+                    max_capital_utilized = current_capital_used
 
     # Close any open positions at the end of data
     for pos in active_positions:
         rc = df.iloc[-1]
-        exit_price = float(rc['close']) * (1 - slippage_pct / 100.0)
         
-        pnl_abs = (exit_price - pos["entry_price"]) * pos["quantity"]
-        pnl_pct = ((exit_price - pos["entry_price"]) / pos["entry_price"]) * 100
+        if pos["type"] == "LONG":
+            exit_price = float(rc['close']) * (1 - slippage_pct / 100.0)
+            pnl_abs = (exit_price - pos["entry_price"]) * pos["quantity"]
+            pnl_pct = ((exit_price - pos["entry_price"]) / pos["entry_price"]) * 100
+        else: # SHORT
+            exit_price = float(rc['close']) * (1 + slippage_pct / 100.0)
+            pnl_abs = (pos["entry_price"] - exit_price) * pos["quantity"]
+            pnl_pct = ((pos["entry_price"] - exit_price) / pos["entry_price"]) * 100
         
         available_capital += pos["capital_used"] + pnl_abs
         
         trades.append({
             "entry_date": pos["entry_date"],
             "exit_date": str(rc['timestamp']) if 'timestamp' in df.columns else str(len(df)-1) + " (forced)",
+            "type": pos["type"],
             "entry_price": round(pos["entry_price"], 2),
             "exit_price": round(exit_price, 2),
             "pnl_pct": round(pnl_pct, 2),
@@ -248,7 +329,8 @@ def run_backtest(df, strategy_name="EMA_WPR", timeframe="DAY",
             "total_pnl_pct": total_pnl,
             "max_drawdown_pct": max_drawdown,
             "avg_bars_held": avg_bars,
-            "final_capital": round(available_capital, 2)
+            "final_capital": round(available_capital, 2),
+            "max_capital_utilized": round(max_capital_utilized, 2)
         },
         "trades": trades,
         "equity_curve": equity_curve_pnl

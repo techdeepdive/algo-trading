@@ -23,7 +23,8 @@ export default function BacktestTab({ credentials }) {
     stop_loss_pct: 2.0,
     target_pct: 4.0,
     trailing_stop_pct: 0.0,
-    timeframe: 'DAY'
+    timeframe: 'DAY',
+    trade_direction: 'BOTH'
   });
 
   const [file, setFile] = useState(null);
@@ -40,7 +41,15 @@ export default function BacktestTab({ credentials }) {
   }, []);
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    let newFormData = { ...formData, [e.target.name]: e.target.value };
+    
+    // Default SL/TP for the new strategy
+    if (e.target.name === 'strategy_name' && e.target.value === 'WPR_CROSS_EMA') {
+       newFormData.stop_loss_pct = 5.0;
+       newFormData.target_pct = 7.0;
+    }
+    
+    setFormData(newFormData);
   };
 
   const handleFileChange = (e) => {
@@ -120,6 +129,7 @@ export default function BacktestTab({ credentials }) {
            <select name="strategy_name" value={formData.strategy_name} onChange={handleChange} className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none">
              <option value="EMA_CROSS">EMA Crossover (Fast/Mid)</option>
              <option value="EMA_WPR">EMA + Williams %R</option>
+             <option value="WPR_CROSS_EMA">WPR + EMA Crossover</option>
              <option value="RSI_MR">RSI Mean Reversion</option>
              <option value="BB_BREAKOUT">Bollinger Bands Breakout</option>
              <option value="OI_BREAKOUT">OI Breakout (Options)</option>
@@ -139,10 +149,10 @@ export default function BacktestTab({ credentials }) {
           </>
         )}
         
-        {formData.strategy_name === 'EMA_WPR' && (
+        {['EMA_WPR', 'WPR_CROSS_EMA'].includes(formData.strategy_name) && (
           <>
             <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1">EMA Slow</label>
+              <label className="block text-xs font-medium text-slate-400 mb-1">EMA Slow (Only for EMA_WPR)</label>
               <input type="number" name="ema_slow" value={formData.ema_slow} onChange={handleChange} className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none" />
             </div>
             <div>
@@ -195,6 +205,14 @@ export default function BacktestTab({ credentials }) {
            <label className="block text-xs font-medium text-slate-400 mb-1">Qty per Trade (Lots)</label>
            <input type="number" name="quantity_per_trade" value={formData.quantity_per_trade} onChange={handleChange} className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none" />
         </div>
+        <div>
+           <label className="block text-xs font-medium text-slate-400 mb-1">Trade Direction</label>
+           <select name="trade_direction" value={formData.trade_direction} onChange={handleChange} className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none">
+             <option value="BOTH">Long & Short</option>
+             <option value="LONG">Long Only</option>
+             <option value="SHORT">Short Only</option>
+           </select>
+        </div>
 
         {/* Trade & Risk Settings */}
         <div className="lg:col-span-3 border-t border-slate-800 my-2 pt-4">
@@ -239,7 +257,7 @@ export default function BacktestTab({ credentials }) {
       {results && results.summary && (
         <div className="mt-6 border-t border-slate-800 pt-6">
           <h3 className="text-lg font-bold text-white mb-4">Results</h3>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
             <div className="p-4 bg-slate-950 border border-slate-800 rounded-lg">
               <div className="text-xs text-slate-400 mb-1">Total Trades</div>
               <div className="text-xl font-bold text-white">{results.summary.total_trades}</div>
@@ -264,6 +282,10 @@ export default function BacktestTab({ credentials }) {
               <div className="text-xs text-slate-400 mb-1">Max Drawdown</div>
               <div className="text-xl font-bold text-rose-400">{results.summary.max_drawdown_pct.toFixed(2)}%</div>
             </div>
+            <div className="p-4 bg-slate-950 border border-slate-800 rounded-lg">
+              <div className="text-xs text-slate-400 mb-1">Max Capital Used</div>
+              <div className="text-xl font-bold text-amber-400">₹{results.summary.max_capital_utilized ? results.summary.max_capital_utilized.toFixed(2) : "0.00"}</div>
+            </div>
           </div>
           
           <div className="mt-4">
@@ -278,6 +300,7 @@ export default function BacktestTab({ credentials }) {
                  <thead className="bg-slate-900 sticky top-0 text-slate-400">
                    <tr>
                      <th className="px-4 py-2">Entry Time</th>
+                     <th className="px-4 py-2">Type</th>
                      <th className="px-4 py-2">Reason</th>
                      <th className="px-4 py-2">Entry Price</th>
                      <th className="px-4 py-2">Exit Time</th>
@@ -289,14 +312,15 @@ export default function BacktestTab({ credentials }) {
                  </thead>
                  <tbody className="divide-y divide-slate-800">
                    {results.trades.length === 0 ? (
-                     <tr><td colSpan="8" className="px-4 py-4 text-center text-slate-500">No trades executed</td></tr>
+                     <tr><td colSpan="9" className="px-4 py-4 text-center text-slate-500">No trades executed</td></tr>
                    ) : (
                      results.trades.map((t, i) => {
                        const pnlAbs = t.capital_used * (t.pnl_pct / 100);
                        return (
                          <tr key={i}>
                            <td className="px-4 py-2">{t.entry_date}</td>
-                           <td className="px-4 py-2 text-indigo-400 font-bold">{t.exit_reason}</td>
+                           <td className={`px-4 py-2 font-bold ${t.type === 'LONG' ? 'text-indigo-400' : 'text-rose-400'}`}>{t.type || 'LONG'}</td>
+                           <td className="px-4 py-2 text-slate-400">{t.exit_reason}</td>
                            <td className="px-4 py-2">₹{t.entry_price.toFixed(2)}</td>
                            <td className="px-4 py-2">{t.exit_date}</td>
                            <td className="px-4 py-2">₹{t.exit_price.toFixed(2)}</td>

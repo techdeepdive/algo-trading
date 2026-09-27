@@ -7,3 +7,4 @@ Dependencies/
 downloads/
 frontend/node_modules/
 
+*.db

@@ -1,0 +1,245 @@
+import sqlite3
+import threading
+import time
+from datetime import datetime
+import pandas as pd
+from Dhan_Tradehull import Tradehull
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("scanner_backend")
+
+DB_FILE = "algo_lab.db"
+SCAN_INTERVAL_SECONDS = 300  # 5 minutes
+
+# List of Nifty 50 stocks to scan
+NIFTY_SYMBOLS = [
+    "RELIANCE", "HDFCBANK", "TCS", "INFY", "ICICIBANK", "SBIN", 
+    "BHARTIARTL", "ITC", "KOTAKBANK", "LT", "AXISBANK", "HINDUNILVR", 
+    "ASIANPAINT", "BAJFINANCE", "MARUTI", "SUNPHARMA", "TITAN", 
+    "TATASTEEL", "ULTRACEMCO", "NTPC", "POWERGRID", "TECHM",
+    "APOLLOHOSP", "BEL", "BPCL", "CIPLA", "GRASIM", "HCLTECH",
+    "HEROMOTOCO", "HINDALCO", "INDUSINDBK"
+]
+
+_scanner_thread = None
+_scanner_running = False
+
+def init_db():
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS paper_trades (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            symbol TEXT,
+            trade_type TEXT,
+            option_symbol TEXT,
+            entry_time TEXT,
+            spot_entry REAL,
+            premium_entry REAL,
+            stop_loss REAL,
+            target REAL,
+            status TEXT,
+            pnl REAL,
+            exit_time TEXT,
+            exit_premium REAL
+        )
+    ''')
+    
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS scan_state (
+            symbol TEXT PRIMARY KEY,
+            ltp REAL,
+            wpr REAL,
+            ema_fast REAL,
+            ema_mid REAL,
+            signal TEXT,
+            last_updated TEXT
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+def compute_signals(df, ema_fast=5, ema_mid=15, ema_slow=50, wpr_period=70):
+    if df is None or len(df) < max(ema_slow, wpr_period):
+        return "NEUTRAL", {}
+
+    df['EMA_fast'] = df['close'].ewm(span=ema_fast, adjust=False).mean()
+    df['EMA_mid']  = df['close'].ewm(span=ema_mid, adjust=False).mean()
+    hh = df['high'].rolling(wpr_period).max()
+    ll = df['low'].rolling(wpr_period).min()
+    df['WPR'] = (hh - df['close']) / (hh - ll) * -100
+
+    wpr_long_armed = False
+    wpr_short_armed = False
+    
+    # Rebuild armed state to match backtester exactly
+    for i in range(1, len(df)):
+        c = df.iloc[i]
+        if c['WPR'] < -70:
+            wpr_long_armed = True
+            wpr_short_armed = False
+        elif c['WPR'] > -20:
+            wpr_short_armed = True
+            wpr_long_armed = False
+            
+    rc = df.iloc[-1]
+    pc = df.iloc[-2]
+
+    # Arming logic on crossover
+    bullish = wpr_long_armed and (pc['EMA_fast'] <= pc['EMA_mid'] and rc['EMA_fast'] > rc['EMA_mid'])
+    bearish = wpr_short_armed and (pc['EMA_fast'] >= pc['EMA_mid'] and rc['EMA_fast'] < rc['EMA_mid'])
+
+    signal = "LONG" if bullish else "SHORT" if bearish else "NEUTRAL"
+    indicators = {
+        "ema_fast": float(rc['EMA_fast']),
+        "ema_mid":  float(rc['EMA_mid']),
+        "wpr":      float(rc['WPR']),
+    }
+    return signal, indicators
+
+def scanner_loop(client_id, access_token, tg_bot=None, tg_chat=None):
+    global _scanner_running
+    
+    try:
+        tsl = Tradehull(client_id, access_token, mode="access_token")
+    except Exception as e:
+        logger.error(f"Failed to init Tradehull: {e}")
+        _scanner_running = False
+        return
+
+    while _scanner_running:
+        logger.info("Starting scan sweep...")
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        
+        for symbol in NIFTY_SYMBOLS:
+            if not _scanner_running:
+                break
+                
+            try:
+                df = tsl.get_historical_data(tradingsymbol=symbol, exchange="NSE", timeframe="15")
+                if df is None or df.empty:
+                    continue
+                    
+                ltp = float(df.iloc[-1]['close'])
+                signal, ind = compute_signals(df)
+                
+                # Update Scan State
+                cursor.execute('''
+                    INSERT OR REPLACE INTO scan_state (symbol, ltp, wpr, ema_fast, ema_mid, signal, last_updated)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                ''', (symbol, ltp, ind.get('wpr', 0), ind.get('ema_fast', 0), ind.get('ema_mid', 0), signal, datetime.now().isoformat()))
+                conn.commit()
+
+                # Check existing open trades
+                cursor.execute("SELECT id, trade_type, spot_entry, premium_entry, stop_loss, target FROM paper_trades WHERE symbol=? AND status='OPEN'", (symbol,))
+                open_trades = cursor.fetchall()
+                
+                for t_id, t_type, spot_entry, qty, sl, tgt in open_trades:
+                    # In this equity mode, premium_entry = qty
+                    current_value = ltp * qty
+                    entry_value = spot_entry * qty
+                    
+                    if t_type == "LONG":
+                        pnl = current_value - entry_value
+                    else:
+                        pnl = entry_value - current_value
+                        
+                    status = 'OPEN'
+                    if (t_type == "LONG" and ltp <= sl) or (t_type == "SHORT" and ltp >= sl):
+                        status = 'CLOSED_SL'
+                    elif (t_type == "LONG" and ltp >= tgt) or (t_type == "SHORT" and ltp <= tgt):
+                        status = 'CLOSED_TARGET'
+                        
+                    cursor.execute('''
+                        UPDATE paper_trades 
+                        SET pnl=?, status=?, exit_time=?, exit_premium=? 
+                        WHERE id=?
+                    ''', (pnl, status, datetime.now().isoformat() if status != 'OPEN' else None, ltp if status != 'OPEN' else None, t_id))
+                    conn.commit()
+                    
+                    if status != 'OPEN' and tg_bot and tg_chat:
+                        try:
+                            msg = f"PAPER EXIT: {symbol} {t_type} {status}. PNL: ₹{pnl:.2f}. Exit Price: {ltp}"
+                            tsl.send_telegram_alert(message=msg, receiver_chat_id=tg_chat, bot_token=tg_bot)
+                        except: pass
+
+                # Open new trades
+                if signal in ["LONG", "SHORT"]:
+                    cursor.execute("SELECT id FROM paper_trades WHERE symbol=? AND status='OPEN'", (symbol,))
+                    if not cursor.fetchone():
+                        qty = max(1, int(10000 / ltp))
+                        opt_sym = f"{symbol} EQ"
+                        
+                        # 5% SL, 7% Target
+                        if signal == "LONG":
+                            sl = ltp * 0.95
+                            tgt = ltp * 1.07
+                        else:
+                            sl = ltp * 1.05
+                            tgt = ltp * 0.93
+                        
+                        cursor.execute('''
+                            INSERT INTO paper_trades (symbol, trade_type, option_symbol, entry_time, spot_entry, premium_entry, stop_loss, target, status, pnl)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'OPEN', 0.0)
+                        ''', (symbol, signal, opt_sym, datetime.now().isoformat(), ltp, qty, sl, tgt))
+                        conn.commit()
+                        
+                        if tg_bot and tg_chat:
+                            try:
+                                msg = f"PAPER ENTRY: {signal} {qty} {symbol} at {ltp}. SL: {sl:.2f}, TGT: {tgt:.2f}"
+                                tsl.send_telegram_alert(message=msg, receiver_chat_id=tg_chat, bot_token=tg_bot)
+                            except: pass
+
+            except Exception as e:
+                logger.error(f"Error processing {symbol}: {e}")
+                
+            time.sleep(1)
+
+        conn.close()
+        logger.info("Sweep complete. Sleeping...")
+        
+        for _ in range(SCAN_INTERVAL_SECONDS):
+            if not _scanner_running:
+                break
+            time.sleep(1)
+
+def start_scanner(client_id, access_token, tg_bot=None, tg_chat=None):
+    global _scanner_thread, _scanner_running
+    if _scanner_running:
+        return {"status": "success", "message": "Scanner already running"}
+        
+    init_db()
+    _scanner_running = True
+    _scanner_thread = threading.Thread(target=scanner_loop, args=(client_id, access_token, tg_bot, tg_chat))
+    _scanner_thread.daemon = True
+    _scanner_thread.start()
+    return {"status": "success", "message": "Scanner started"}
+
+def stop_scanner():
+    global _scanner_running
+    _scanner_running = False
+    return {"status": "success", "message": "Scanner stopping"}
+
+def get_dashboard_state():
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT * FROM scan_state")
+        scan_state = [dict(row) for row in cursor.fetchall()]
+        
+        cursor.execute("SELECT * FROM paper_trades ORDER BY id DESC LIMIT 100")
+        trades = [dict(row) for row in cursor.fetchall()]
+        
+        conn.close()
+        return {
+            "status": "success",
+            "is_running": _scanner_running,
+            "scan_state": scan_state,
+            "trades": trades
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}

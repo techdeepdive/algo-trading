@@ -492,6 +492,7 @@ def backtest():
     trailing_stop_pct = float(request.form.get("trailing_stop_pct", 0.0))
     timeframe = request.form.get("timeframe", "DAY")
     slippage_pct = float(request.form.get("slippage_pct", 0.1))
+    trade_direction = request.form.get("trade_direction", "BOTH")
 
     result = run_backtest(
         df, 
@@ -509,7 +510,8 @@ def backtest():
         trailing_stop_pct=trailing_stop_pct,
         slippage_pct=slippage_pct,
         initial_capital=initial_capital,
-        quantity_per_trade=quantity_per_trade
+        quantity_per_trade=quantity_per_trade,
+        trade_direction=trade_direction
     )
     if symbol:
         result["symbol"] = symbol
@@ -609,6 +611,101 @@ def api_news():
             })
             
     return jsonify({"status": "success", "news": results})
+
+from scanner_backend import start_scanner, stop_scanner, get_dashboard_state
+
+@app.route("/api/algolab/start", methods=["POST"])
+def api_algolab_start():
+    data = request.json
+    client_id = data.get("client_id")
+    access_token = data.get("access_token")
+    tg_bot = data.get("tg_bot")
+    tg_chat = data.get("tg_chat")
+    if not client_id or not access_token:
+        return jsonify({"status": "error", "message": "Dhan credentials required"}), 400
+    res = start_scanner(client_id, access_token, tg_bot, tg_chat)
+    return jsonify(res)
+
+@app.route("/api/algolab/stop", methods=["POST"])
+def api_algolab_stop():
+    res = stop_scanner()
+    return jsonify(res)
+
+@app.route("/api/algolab/state", methods=["GET"])
+def api_algolab_state():
+    res = get_dashboard_state()
+    return jsonify(res)
+
+@app.route("/api/algolab/clear", methods=["POST"])
+def api_algolab_clear():
+    try:
+        import sqlite3
+        conn = sqlite3.connect('algo_lab.db')
+        c = conn.cursor()
+        c.execute("DELETE FROM scan_state")
+        c.execute("DELETE FROM paper_trades")
+        conn.commit()
+        conn.close()
+        return jsonify({"status": "success", "message": "Database cleared successfully"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route("/api/algolab/trade", methods=["POST"])
+def api_algolab_trade():
+    data = request.json
+    client_id = data.get("client_id")
+    access_token = data.get("access_token")
+    symbol = data.get("symbol")
+    trade_type = data.get("trade_type", "LONG")
+    qty = int(data.get("qty", 1))
+    limit_price = float(data.get("price", 0))
+    sl = float(data.get("sl", 0))
+    tgt = float(data.get("tgt", 0))
+    tg_bot = data.get("tg_bot")
+    tg_chat = data.get("tg_chat")
+    
+    if not client_id or not access_token:
+        return jsonify({"status": "error", "message": "Dhan credentials required"}), 400
+        
+    try:
+        from Dhan_Tradehull import Tradehull
+        tsl = Tradehull(client_id, access_token, mode="access_token")
+        
+        transaction_type = "BUY" if trade_type == "LONG" else "SELL"
+        
+        order_id = tsl.place_super_order(
+            tradingsymbol=symbol, 
+            exchange="NSE",
+            transaction_type=transaction_type, 
+            quantity=qty,
+            order_type="LIMIT", 
+            trade_type="MIS",
+            price=limit_price, 
+            target_price=tgt,
+            stop_loss_price=sl,
+            trailing_jump=0.0
+        )
+        
+        if order_id is None or order_id == "":
+            return jsonify({
+                "status": "error",
+                "message": f"Order rejected by broker. This usually happens if the market is closed, margin is insufficient, or credentials expired. Attempted: {qty} {symbol} at {limit_price}"
+            }), 400
+            
+        msg = f"LIVE TRADE: {transaction_type} {qty} {symbol} at {limit_price}. SL: {sl}, TGT: {tgt} (Order ID: {order_id})"
+        if tg_bot and tg_chat:
+            try:
+                tsl.send_telegram_alert(message=msg, receiver_chat_id=tg_chat, bot_token=tg_bot)
+            except Exception as tg_err:
+                pass # Ignore telegram errors so trade still succeeds on frontend
+                
+        return jsonify({
+            "status": "success", 
+            "message": msg,
+            "order_id": order_id
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 400
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=PORT, debug=False)
