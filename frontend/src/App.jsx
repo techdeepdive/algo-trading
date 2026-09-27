@@ -35,7 +35,7 @@ function App() {
     { id: 'historical', label: 'Historical Data', icon: Clock },
     { id: 'backtest', label: 'Backtesting', icon: Activity },
     { id: 'hedging', label: 'Hedging', icon: ShieldCheck },
-    { id: 'scanner', label: 'AlgoLab', icon: Activity },
+    { id: 'scanner', label: 'Live Trade', icon: Activity },
     { id: 'news', label: 'Market News (AI)', icon: Newspaper },
   ];
 

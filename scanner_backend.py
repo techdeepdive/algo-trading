@@ -12,7 +12,7 @@ logger = logging.getLogger("scanner_backend")
 DB_FILE = "algo_lab.db"
 SCAN_INTERVAL_SECONDS = 300  # 5 minutes
 
-# List of Nifty 50 stocks to scan
+# Watchlists
 NIFTY_SYMBOLS = [
     "RELIANCE", "HDFCBANK", "TCS", "INFY", "ICICIBANK", "SBIN", 
     "BHARTIARTL", "ITC", "KOTAKBANK", "LT", "AXISBANK", "HINDUNILVR", 
@@ -21,6 +21,13 @@ NIFTY_SYMBOLS = [
     "APOLLOHOSP", "BEL", "BPCL", "CIPLA", "GRASIM", "HCLTECH",
     "HEROMOTOCO", "HINDALCO", "INDUSINDBK"
 ]
+
+BANKNIFTY_SYMBOLS = [
+    "HDFCBANK", "ICICIBANK", "AXISBANK", "SBIN", "KOTAKBANK", 
+    "INDUSINDBK", "BANKBARODA", "AUBANK", "FEDERALBNK", "IDFCFIRSTB", "PNB", "BANDHANBNK"
+]
+
+MCX_SYMBOLS = ["CRUDEOIL", "GOLD", "SILVER", "NATURALGAS", "COPPER", "ZINC", "ALUMINIUM", "LEAD"]
 
 _scanner_thread = None
 _scanner_running = False
@@ -60,46 +67,115 @@ def init_db():
     conn.commit()
     conn.close()
 
-def compute_signals(df, ema_fast=5, ema_mid=15, ema_slow=50, wpr_period=70):
-    if df is None or len(df) < max(ema_slow, wpr_period):
+def compute_signals(df, strategy_name='WPR_CROSS_EMA'):
+    if df is None or len(df) < 20:
         return "NEUTRAL", {}
 
-    df['EMA_fast'] = df['close'].ewm(span=ema_fast, adjust=False).mean()
-    df['EMA_mid']  = df['close'].ewm(span=ema_mid, adjust=False).mean()
-    hh = df['high'].rolling(wpr_period).max()
-    ll = df['low'].rolling(wpr_period).min()
-    df['WPR'] = (hh - df['close']) / (hh - ll) * -100
-
-    wpr_long_armed = False
-    wpr_short_armed = False
+    signal = "NEUTRAL"
+    indicators = {}
     
-    # Rebuild armed state to match backtester exactly
-    for i in range(1, len(df)):
-        c = df.iloc[i]
-        if c['WPR'] < -70:
-            wpr_long_armed = True
-            wpr_short_armed = False
-        elif c['WPR'] > -20:
-            wpr_short_armed = True
-            wpr_long_armed = False
-            
-    rc = df.iloc[-1]
-    pc = df.iloc[-2]
+    if strategy_name == 'WPR_CROSS_EMA':
+        ema_fast = 5
+        ema_mid = 15
+        wpr_period = 70
+        
+        df['EMA_fast'] = df['close'].ewm(span=ema_fast, adjust=False).mean()
+        df['EMA_mid']  = df['close'].ewm(span=ema_mid, adjust=False).mean()
+        hh = df['high'].rolling(wpr_period).max()
+        ll = df['low'].rolling(wpr_period).min()
+        df['WPR'] = (hh - df['close']) / (hh - ll) * -100
 
-    # Arming logic on crossover
-    bullish = wpr_long_armed and (pc['EMA_fast'] <= pc['EMA_mid'] and rc['EMA_fast'] > rc['EMA_mid'])
-    bearish = wpr_short_armed and (pc['EMA_fast'] >= pc['EMA_mid'] and rc['EMA_fast'] < rc['EMA_mid'])
+        wpr_long_armed = False
+        wpr_short_armed = False
+        
+        for i in range(1, len(df)):
+            c = df.iloc[i]
+            if c['WPR'] < -70:
+                wpr_long_armed = True
+                wpr_short_armed = False
+            elif c['WPR'] > -20:
+                wpr_short_armed = True
+                wpr_long_armed = False
+                
+        rc = df.iloc[-1]
+        pc = df.iloc[-2]
 
-    signal = "LONG" if bullish else "SHORT" if bearish else "NEUTRAL"
-    indicators = {
-        "ema_fast": float(rc['EMA_fast']),
-        "ema_mid":  float(rc['EMA_mid']),
-        "wpr":      float(rc['WPR']),
-    }
+        bullish = wpr_long_armed and (pc['EMA_fast'] <= pc['EMA_mid'] and rc['EMA_fast'] > rc['EMA_mid'])
+        bearish = wpr_short_armed and (pc['EMA_fast'] >= pc['EMA_mid'] and rc['EMA_fast'] < rc['EMA_mid'])
+
+        signal = "LONG" if bullish else "SHORT" if bearish else "NEUTRAL"
+        indicators = {
+            "ema_fast": float(rc['EMA_fast']),
+            "ema_mid":  float(rc['EMA_mid']),
+            "wpr":      float(rc['WPR']),
+        }
+        
+    elif strategy_name == 'RSI_MR':
+        # RSI Mean Reversion
+        delta = df['close'].diff()
+        gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+        rs = gain / loss
+        df['RSI'] = 100 - (100 / (1 + rs))
+        
+        rc = df.iloc[-1]
+        pc = df.iloc[-2]
+        
+        bullish = pc['RSI'] < 30 and rc['RSI'] >= 30
+        bearish = pc['RSI'] > 70 and rc['RSI'] <= 70
+        
+        signal = "LONG" if bullish else "SHORT" if bearish else "NEUTRAL"
+        indicators = {
+            "wpr": float(rc['RSI']), # Using WPR column to show RSI in UI
+            "ema_fast": 0.0,
+            "ema_mid": 0.0
+        }
+        
+    elif strategy_name == 'BB_BREAKOUT':
+        # Bollinger Bands Breakout
+        df['SMA'] = df['close'].rolling(window=20).mean()
+        df['STD'] = df['close'].rolling(window=20).std()
+        df['Upper'] = df['SMA'] + (df['STD'] * 2)
+        df['Lower'] = df['SMA'] - (df['STD'] * 2)
+        
+        rc = df.iloc[-1]
+        pc = df.iloc[-2]
+        
+        bullish = pc['close'] <= pc['Upper'] and rc['close'] > rc['Upper']
+        bearish = pc['close'] >= pc['Lower'] and rc['close'] < rc['Lower']
+        
+        signal = "LONG" if bullish else "SHORT" if bearish else "NEUTRAL"
+        indicators = {
+            "wpr": float(rc['close']), # Using wpr to show close price
+            "ema_fast": float(rc['Upper']),
+            "ema_mid": float(rc['Lower'])
+        }
+        
+    elif strategy_name == 'OI_BREAKOUT':
+        signal = "NEUTRAL" # OI not available in standard historical data
+        indicators = {"wpr": 0, "ema_fast": 0, "ema_mid": 0}
+
     return signal, indicators
 
-def scanner_loop(client_id, access_token, tg_bot=None, tg_chat=None):
+def scanner_loop(client_id, access_token, tg_bot=None, tg_chat=None, strategy_name='WPR_CROSS_EMA', watchlists=None, custom_symbols=None):
     global _scanner_running
+    
+    if watchlists is None:
+        watchlists = ['nifty50']
+    
+    symbols_to_scan = set()
+    if 'nifty50' in watchlists:
+        symbols_to_scan.update(NIFTY_SYMBOLS)
+    if 'banknifty' in watchlists:
+        symbols_to_scan.update(BANKNIFTY_SYMBOLS)
+    if 'mcx' in watchlists:
+        symbols_to_scan.update(MCX_SYMBOLS)
+        
+    if custom_symbols:
+        custom_list = [s.strip().upper() for s in custom_symbols.split(',') if s.strip()]
+        symbols_to_scan.update(custom_list)
+        
+    symbols_to_scan = list(symbols_to_scan)
     
     try:
         tsl = Tradehull(client_id, access_token, mode="access_token")
@@ -113,17 +189,18 @@ def scanner_loop(client_id, access_token, tg_bot=None, tg_chat=None):
         conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
         
-        for symbol in NIFTY_SYMBOLS:
+        for symbol in symbols_to_scan:
             if not _scanner_running:
                 break
                 
             try:
-                df = tsl.get_historical_data(tradingsymbol=symbol, exchange="NSE", timeframe="15")
+                exchange = "MCX" if symbol in MCX_SYMBOLS else "NSE"
+                df = tsl.get_historical_data(tradingsymbol=symbol, exchange=exchange, timeframe="15")
                 if df is None or df.empty:
                     continue
                     
                 ltp = float(df.iloc[-1]['close'])
-                signal, ind = compute_signals(df)
+                signal, ind = compute_signals(df, strategy_name)
                 
                 # Update Scan State
                 cursor.execute('''
@@ -205,14 +282,14 @@ def scanner_loop(client_id, access_token, tg_bot=None, tg_chat=None):
                 break
             time.sleep(1)
 
-def start_scanner(client_id, access_token, tg_bot=None, tg_chat=None):
+def start_scanner(client_id, access_token, tg_bot=None, tg_chat=None, strategy_name='WPR_CROSS_EMA', watchlists=None, custom_symbols=None):
     global _scanner_thread, _scanner_running
     if _scanner_running:
         return {"status": "success", "message": "Scanner already running"}
         
     init_db()
     _scanner_running = True
-    _scanner_thread = threading.Thread(target=scanner_loop, args=(client_id, access_token, tg_bot, tg_chat))
+    _scanner_thread = threading.Thread(target=scanner_loop, args=(client_id, access_token, tg_bot, tg_chat, strategy_name, watchlists, custom_symbols))
     _scanner_thread.daemon = True
     _scanner_thread.start()
     return {"status": "success", "message": "Scanner started"}

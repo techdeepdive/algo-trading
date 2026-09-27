@@ -621,9 +621,12 @@ def api_algolab_start():
     access_token = data.get("access_token")
     tg_bot = data.get("tg_bot")
     tg_chat = data.get("tg_chat")
+    strategy_name = data.get("strategy_name", "WPR_CROSS_EMA")
+    watchlists = data.get("watchlists", ["nifty50"])
+    custom_symbols = data.get("custom_symbols", "")
     if not client_id or not access_token:
         return jsonify({"status": "error", "message": "Dhan credentials required"}), 400
-    res = start_scanner(client_id, access_token, tg_bot, tg_chat)
+    res = start_scanner(client_id, access_token, tg_bot, tg_chat, strategy_name, watchlists, custom_symbols)
     return jsonify(res)
 
 @app.route("/api/algolab/stop", methods=["POST"])

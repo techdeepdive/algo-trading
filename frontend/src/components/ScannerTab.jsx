@@ -9,6 +9,9 @@ export default function ScannerTab({ credentials }) {
   const [error, setError] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [tradeForm, setTradeForm] = useState(null);
+  const [selectedStrategy, setSelectedStrategy] = useState('WPR_CROSS_EMA');
+  const [watchlists, setWatchlists] = useState(['nifty50']);
+  const [customSymbols, setCustomSymbols] = useState('');
 
   // Poll state every 5 seconds
   useEffect(() => {
@@ -49,7 +52,10 @@ export default function ScannerTab({ credentials }) {
           client_id: credentials.client_id,
           access_token: credentials.access_token,
           tg_bot: credentials.tg_bot,
-          tg_chat: credentials.tg_chat
+          tg_chat: credentials.tg_chat,
+          strategy_name: selectedStrategy,
+          watchlists: watchlists,
+          custom_symbols: customSymbols
         })
       });
       const data = await res.json();
@@ -121,8 +127,8 @@ export default function ScannerTab({ credentials }) {
     }
   };
 
-  const clearDatabase = async () => {
-    if (!window.confirm("Are you sure you want to clear all scanner data and paper trades?")) return;
+  const clearDatabase = async (force = false) => {
+    if (!force && !window.confirm("Are you sure you want to clear all scanner data and paper trades?")) return;
     try {
       await fetch('/api/algolab/clear', { method: 'POST' });
       setScanState([]);
@@ -131,6 +137,17 @@ export default function ScannerTab({ credentials }) {
       console.error(err);
     }
   };
+
+  useEffect(() => {
+    // If strategy changes, stop engine if running and clear data
+    const handleStrategyChange = async () => {
+      if (engineRunning) {
+        await toggleEngine();
+      }
+      clearDatabase(true);
+    };
+    handleStrategyChange();
+  }, [selectedStrategy]);
 
   // Metrics calculation
   const openTrades = trades.filter(t => t.status === 'OPEN');
@@ -150,14 +167,55 @@ export default function ScannerTab({ credentials }) {
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-xl shadow-xl overflow-hidden">
       <div className="p-6">
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
           <div>
             <h2 className="text-xl font-bold text-white flex items-center gap-2">
-              AlgoLab — Nifty 50 WPR + EMA Breakout
+              Live Trade / Scanner
             </h2>
-            <p className="text-sm text-slate-400 mt-1">
-              Paper trading only. WPR(70) condition + 5/15 EMA crossover on 15-minute candles. Buys mock ATM Options.
-            </p>
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <select 
+                value={selectedStrategy}
+                onChange={(e) => setSelectedStrategy(e.target.value)}
+                className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-indigo-500"
+              >
+                <option value="WPR_CROSS_EMA">WPR + 5/15 EMA Crossover</option>
+                <option value="RSI_MR">RSI Mean Reversion</option>
+                <option value="BB_BREAKOUT">Bollinger Breakout</option>
+                <option value="OI_BREAKOUT">OI Spike Breakout (Mocked)</option>
+              </select>
+              
+              <div className="flex items-center gap-2">
+                <label className="text-xs text-slate-400 flex items-center gap-1 cursor-pointer hover:text-slate-300">
+                  <input type="checkbox" checked={watchlists.includes('nifty50')} onChange={(e) => {
+                    if (e.target.checked) setWatchlists([...watchlists, 'nifty50']);
+                    else setWatchlists(watchlists.filter(w => w !== 'nifty50'));
+                  }} className="rounded bg-slate-800 border-slate-700 text-indigo-500" />
+                  Nifty 50
+                </label>
+                <label className="text-xs text-slate-400 flex items-center gap-1 cursor-pointer hover:text-slate-300">
+                  <input type="checkbox" checked={watchlists.includes('banknifty')} onChange={(e) => {
+                    if (e.target.checked) setWatchlists([...watchlists, 'banknifty']);
+                    else setWatchlists(watchlists.filter(w => w !== 'banknifty'));
+                  }} className="rounded bg-slate-800 border-slate-700 text-indigo-500" />
+                  BankNifty
+                </label>
+                <label className="text-xs text-slate-400 flex items-center gap-1 cursor-pointer hover:text-slate-300">
+                  <input type="checkbox" checked={watchlists.includes('mcx')} onChange={(e) => {
+                    if (e.target.checked) setWatchlists([...watchlists, 'mcx']);
+                    else setWatchlists(watchlists.filter(w => w !== 'mcx'));
+                  }} className="rounded bg-slate-800 border-slate-700 text-indigo-500" />
+                  MCX
+                </label>
+              </div>
+
+              <input 
+                type="text"
+                placeholder="Custom (e.g. TCS, INFY)"
+                value={customSymbols}
+                onChange={(e) => setCustomSymbols(e.target.value)}
+                className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-indigo-500 w-40 placeholder-slate-500"
+              />
+            </div>
           </div>
           <div className="flex gap-3">
             <button
@@ -277,17 +335,45 @@ export default function ScannerTab({ credentials }) {
         </div>
 
         {/* Scanner State Table */}
-        <h3 className="text-sm font-bold text-white mb-3">Nifty 50 Scanner State (WPR + EMA)</h3>
+        <h3 className="text-sm font-bold text-white mb-3">Scanner State</h3>
         <div className="bg-slate-950 rounded-xl border border-slate-800 overflow-x-auto max-h-[400px]">
           <table className="w-full text-left text-xs whitespace-nowrap">
             <thead className="bg-slate-900 sticky top-0 border-b border-slate-800 text-slate-400 uppercase tracking-wider">
               <tr>
                 <th className="px-4 py-3 font-semibold">Stock</th>
                 <th className="px-4 py-3 font-semibold text-right">LTP</th>
-                <th className="px-4 py-3 font-semibold text-right">WPR(70)</th>
-                <th className="px-4 py-3 font-semibold text-right">5 EMA</th>
-                <th className="px-4 py-3 font-semibold text-right">15 EMA</th>
-                <th className="px-4 py-3 font-semibold text-center">Cross Status</th>
+                {selectedStrategy === 'WPR_CROSS_EMA' && (
+                  <>
+                    <th className="px-4 py-3 font-semibold text-right">WPR(70)</th>
+                    <th className="px-4 py-3 font-semibold text-right">5 EMA</th>
+                    <th className="px-4 py-3 font-semibold text-right">15 EMA</th>
+                    <th className="px-4 py-3 font-semibold text-center">Trend</th>
+                  </>
+                )}
+                {selectedStrategy === 'RSI_MR' && (
+                  <>
+                    <th className="px-4 py-3 font-semibold text-right">RSI(14)</th>
+                    <th className="px-4 py-3 font-semibold text-right">-</th>
+                    <th className="px-4 py-3 font-semibold text-right">-</th>
+                    <th className="px-4 py-3 font-semibold text-center">Trend</th>
+                  </>
+                )}
+                {selectedStrategy === 'BB_BREAKOUT' && (
+                  <>
+                    <th className="px-4 py-3 font-semibold text-right">Close</th>
+                    <th className="px-4 py-3 font-semibold text-right">Upper BB</th>
+                    <th className="px-4 py-3 font-semibold text-right">Lower BB</th>
+                    <th className="px-4 py-3 font-semibold text-center">Trend</th>
+                  </>
+                )}
+                {selectedStrategy === 'OI_BREAKOUT' && (
+                  <>
+                    <th className="px-4 py-3 font-semibold text-right">Ind 1</th>
+                    <th className="px-4 py-3 font-semibold text-right">Ind 2</th>
+                    <th className="px-4 py-3 font-semibold text-right">Ind 3</th>
+                    <th className="px-4 py-3 font-semibold text-center">Trend</th>
+                  </>
+                )}
                 <th className="px-4 py-3 font-semibold text-center">Signal</th>
                 <th className="px-4 py-3 font-semibold text-center">Action</th>
               </tr>
@@ -308,16 +394,57 @@ export default function ScannerTab({ credentials }) {
                     <tr key={s.symbol} className="hover:bg-slate-900/50 transition-colors">
                       <td className="px-4 py-2 font-bold text-white">{s.symbol}</td>
                       <td className="px-4 py-2 text-right">₹{s.ltp.toFixed(2)}</td>
-                      <td className={`px-4 py-2 text-right font-medium ${s.wpr < -70 ? 'text-rose-400' : s.wpr > -20 ? 'text-emerald-400' : 'text-slate-300'}`}>
-                        {s.wpr.toFixed(2)}
-                      </td>
-                      <td className="px-4 py-2 text-right text-slate-300">{s.ema_fast.toFixed(2)}</td>
-                      <td className="px-4 py-2 text-right text-slate-300">{s.ema_mid.toFixed(2)}</td>
-                      <td className="px-4 py-2 text-center">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${bullish_cross ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}`}>
-                          {cross_status}
-                        </span>
-                      </td>
+                      {selectedStrategy === 'WPR_CROSS_EMA' && (
+                        <>
+                          <td className={`px-4 py-2 text-right font-medium ${s.wpr < -70 ? 'text-rose-400' : s.wpr > -20 ? 'text-emerald-400' : 'text-slate-300'}`}>
+                            {s.wpr.toFixed(2)}
+                          </td>
+                          <td className="px-4 py-2 text-right text-slate-300">{s.ema_fast.toFixed(2)}</td>
+                          <td className="px-4 py-2 text-right text-slate-300">{s.ema_mid.toFixed(2)}</td>
+                          <td className="px-4 py-2 text-center">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${bullish_cross ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}`}>
+                              {cross_status}
+                            </span>
+                          </td>
+                        </>
+                      )}
+                      
+                      {selectedStrategy === 'RSI_MR' && (
+                        <>
+                          <td className={`px-4 py-2 text-right font-medium ${s.wpr > 70 ? 'text-rose-400' : s.wpr < 30 ? 'text-emerald-400' : 'text-slate-300'}`}>
+                            {s.wpr.toFixed(2)}
+                          </td>
+                          <td className="px-4 py-2 text-right text-slate-500">-</td>
+                          <td className="px-4 py-2 text-right text-slate-500">-</td>
+                          <td className="px-4 py-2 text-center">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${s.wpr > 50 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}`}>
+                              {s.wpr > 50 ? 'BULL' : 'BEAR'}
+                            </span>
+                          </td>
+                        </>
+                      )}
+                      
+                      {selectedStrategy === 'BB_BREAKOUT' && (
+                        <>
+                          <td className="px-4 py-2 text-right text-slate-300">{s.wpr.toFixed(2)}</td>
+                          <td className="px-4 py-2 text-right text-slate-300">{s.ema_fast.toFixed(2)}</td>
+                          <td className="px-4 py-2 text-right text-slate-300">{s.ema_mid.toFixed(2)}</td>
+                          <td className="px-4 py-2 text-center">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${s.wpr > s.ema_fast ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : s.wpr < s.ema_mid ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' : 'text-slate-500'}`}>
+                              {s.wpr > s.ema_fast ? 'BULL' : s.wpr < s.ema_mid ? 'BEAR' : 'MID'}
+                            </span>
+                          </td>
+                        </>
+                      )}
+                      
+                      {selectedStrategy === 'OI_BREAKOUT' && (
+                        <>
+                          <td className="px-4 py-2 text-right text-slate-500">-</td>
+                          <td className="px-4 py-2 text-right text-slate-500">-</td>
+                          <td className="px-4 py-2 text-right text-slate-500">-</td>
+                          <td className="px-4 py-2 text-center text-slate-500">-</td>
+                        </>
+                      )}
                       <td className="px-4 py-2 text-center">
                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                           s.signal === 'LONG' ? 'bg-emerald-500/20 text-emerald-400' : 
