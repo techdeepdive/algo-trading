@@ -1,10 +1,12 @@
 import sqlite3
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 import pandas as pd
 from Dhan_Tradehull import Tradehull
 import logging
+
+IST = timezone(timedelta(hours=5, minutes=30))
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("scanner_backend")
@@ -206,7 +208,7 @@ def scanner_loop(client_id, access_token, tg_bot=None, tg_chat=None, strategy_na
                 cursor.execute('''
                     INSERT OR REPLACE INTO scan_state (symbol, ltp, wpr, ema_fast, ema_mid, signal, last_updated)
                     VALUES (?, ?, ?, ?, ?, ?, ?)
-                ''', (symbol, ltp, ind.get('wpr', 0), ind.get('ema_fast', 0), ind.get('ema_mid', 0), signal, datetime.now().isoformat()))
+                ''', (symbol, ltp, ind.get('wpr', 0), ind.get('ema_fast', 0), ind.get('ema_mid', 0), signal, datetime.now(IST).isoformat()))
                 conn.commit()
 
                 # Check existing open trades
@@ -233,7 +235,7 @@ def scanner_loop(client_id, access_token, tg_bot=None, tg_chat=None, strategy_na
                         UPDATE paper_trades 
                         SET pnl=?, status=?, exit_time=?, exit_premium=? 
                         WHERE id=?
-                    ''', (pnl, status, datetime.now().isoformat() if status != 'OPEN' else None, ltp if status != 'OPEN' else None, t_id))
+                    ''', (pnl, status, datetime.now(IST).isoformat() if status != 'OPEN' else None, ltp if status != 'OPEN' else None, t_id))
                     conn.commit()
                     
                     if status != 'OPEN' and tg_bot and tg_chat:
@@ -260,7 +262,7 @@ def scanner_loop(client_id, access_token, tg_bot=None, tg_chat=None, strategy_na
                         cursor.execute('''
                             INSERT INTO paper_trades (symbol, trade_type, option_symbol, entry_time, spot_entry, premium_entry, stop_loss, target, status, pnl)
                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'OPEN', 0.0)
-                        ''', (symbol, signal, opt_sym, datetime.now().isoformat(), ltp, qty, sl, tgt))
+                        ''', (symbol, signal, opt_sym, datetime.now(IST).isoformat(), ltp, qty, sl, tgt))
                         conn.commit()
                         
                         if tg_bot and tg_chat:
