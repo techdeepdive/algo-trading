@@ -89,23 +89,13 @@ def compute_signals(df, strategy_name='WPR_CROSS_EMA'):
         ll = df['low'].rolling(wpr_period).min()
         df['WPR'] = (hh - df['close']) / (hh - ll) * -100
 
-        wpr_long_armed = False
-        wpr_short_armed = False
-        
-        for i in range(1, len(df)):
-            c = df.iloc[i]
-            if c['WPR'] < -70:
-                wpr_long_armed = True
-                wpr_short_armed = False
-            elif c['WPR'] > -20:
-                wpr_short_armed = True
-                wpr_long_armed = False
-                
         rc = df.iloc[-1]
-        pc = df.iloc[-2]
 
-        bullish = wpr_long_armed and (pc['EMA_fast'] <= pc['EMA_mid'] and rc['EMA_fast'] > rc['EMA_mid'])
-        bearish = wpr_short_armed and (pc['EMA_fast'] >= pc['EMA_mid'] and rc['EMA_fast'] < rc['EMA_mid'])
+        # Simple concurrent check on the CURRENT candle:
+        # LONG:  WPR is currently oversold (< -70) AND EMA fast is above EMA mid
+        # SHORT: WPR is currently overbought (> -20) AND EMA fast is below EMA mid
+        bullish = (rc['WPR'] < -70) and (rc['EMA_fast'] > rc['EMA_mid'])
+        bearish = (rc['WPR'] > -20) and (rc['EMA_fast'] < rc['EMA_mid'])
 
         signal = "LONG" if bullish else "SHORT" if bearish else "NEUTRAL"
         indicators = {
@@ -268,13 +258,13 @@ def scanner_loop(client_id, access_token, tg_bot=None, tg_chat=None, strategy_na
                         qty = max(1, int(10000 / ltp))
                         opt_sym = f"{symbol} EQ"
                         
-                        # 5% SL, 7% Target
+                        # 3% SL, 3% Target
                         if signal == "LONG":
-                            sl = ltp * 0.95
-                            tgt = ltp * 1.07
+                            sl = ltp * 0.97
+                            tgt = ltp * 1.03
                         else:
-                            sl = ltp * 1.05
-                            tgt = ltp * 0.93
+                            sl = ltp * 1.03
+                            tgt = ltp * 0.97
                         
                         cursor.execute('''
                             INSERT INTO paper_trades (symbol, trade_type, option_symbol, entry_time, spot_entry, premium_entry, stop_loss, target, status, pnl)

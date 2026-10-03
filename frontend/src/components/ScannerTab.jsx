@@ -76,8 +76,8 @@ export default function ScannerTab({ credentials }) {
     const rt = (price) => Math.round(price / 0.05) * 0.05;
     
     let limit = trade_type === 'LONG' ? rt(ltp * 1.005) : rt(ltp * 0.995);
-    let sl = trade_type === 'LONG' ? rt(limit * 0.95) : rt(limit * 1.05);
-    let tgt = trade_type === 'LONG' ? rt(limit * 1.07) : rt(limit * 0.93);
+    let sl = trade_type === 'LONG' ? rt(limit * 0.97) : rt(limit * 1.03);
+    let tgt = trade_type === 'LONG' ? rt(limit * 1.03) : rt(limit * 0.97);
     
     setTradeForm({
       symbol,

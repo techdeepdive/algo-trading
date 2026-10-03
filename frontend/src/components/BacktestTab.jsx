@@ -45,8 +45,8 @@ export default function BacktestTab({ credentials }) {
     
     // Default SL/TP for the new strategy
     if (e.target.name === 'strategy_name' && e.target.value === 'WPR_CROSS_EMA') {
-       newFormData.stop_loss_pct = 5.0;
-       newFormData.target_pct = 7.0;
+       newFormData.stop_loss_pct = 3.0;
+       newFormData.target_pct = 3.0;
     }
     
     setFormData(newFormData);

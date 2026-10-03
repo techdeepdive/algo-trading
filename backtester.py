@@ -78,6 +78,8 @@ def run_backtest(df, strategy_name="EMA_WPR", timeframe="DAY",
     # State variables for WPR_CROSS_EMA strategy
     wpr_long_armed = False
     wpr_short_armed = False
+    wpr_armed_at = 0  # candle index when last armed
+    WPR_ARM_EXPIRY = 12  # arm expires after N candles without entry
     
     max_capital_utilized = 0.0
 
@@ -124,25 +126,31 @@ def run_backtest(df, strategy_name="EMA_WPR", timeframe="DAY",
             long_indicator_exit = rc['close'] < pc['low']
 
         elif strategy_name == "WPR_CROSS_EMA":
-            # Arm conditions
+            # Arm conditions based on current candle's WPR
             if rc['WPR'] < -70:
                 wpr_long_armed = True
                 wpr_short_armed = False
+                wpr_armed_at = i
             elif rc['WPR'] > -20:
                 wpr_short_armed = True
                 wpr_long_armed = False
+                wpr_armed_at = i
+            
+            # Expire arm if too many candles have passed without entry
+            if (wpr_long_armed or wpr_short_armed) and (i - wpr_armed_at) > WPR_ARM_EXPIRY:
+                wpr_long_armed = False
+                wpr_short_armed = False
                 
-            # Entry conditions (Wait for the EMA crossover and one candle close at the crossover)
-            # The cross is confirmed on the close of 'rc'
-            if wpr_long_armed and (pc['EMA_fast'] <= pc['EMA_mid'] and rc['EMA_fast'] > rc['EMA_mid']):
+            # Entry conditions: WPR armed + EMA fast is above/below mid
+            if wpr_long_armed and (rc['EMA_fast'] > rc['EMA_mid']):
                 bullish_entry = True
                 wpr_long_armed = False # Reset after entry
                 
-            if wpr_short_armed and (pc['EMA_fast'] >= pc['EMA_mid'] and rc['EMA_fast'] < rc['EMA_mid']):
+            if wpr_short_armed and (rc['EMA_fast'] < rc['EMA_mid']):
                 bearish_entry = True
                 wpr_short_armed = False # Reset after entry
             
-            # No indicator exits requested by user; rely solely on SL/TP.
+            # No indicator exits; rely solely on SL/TP.
 
         # --- Execution Logic ---
         next_open = float(df.iloc[i + 1]['open'])
@@ -224,7 +232,8 @@ def run_backtest(df, strategy_name="EMA_WPR", timeframe="DAY",
                 })
                 
                 # Record total cumulative account PnL % based on initial capital
-                account_pnl_pct = ((available_capital - initial_capital) / initial_capital) * 100
+                total_realized_pnl = sum(t["pnl_pct"] * t["capital_used"] / 100 for t in trades)
+                account_pnl_pct = (total_realized_pnl / initial_capital) * 100
                 equity_curve_pnl.append(round(account_pnl_pct, 2))
             else:
                 remaining_positions.append(pos)
@@ -294,7 +303,8 @@ def run_backtest(df, strategy_name="EMA_WPR", timeframe="DAY",
             "bars_held": len(df) - 1 - pos["entry_idx"]
         })
         
-        account_pnl_pct = ((available_capital - initial_capital) / initial_capital) * 100
+        total_realized_pnl = sum(t["pnl_pct"] * t["capital_used"] / 100 for t in trades)
+        account_pnl_pct = (total_realized_pnl / initial_capital) * 100
         equity_curve_pnl.append(round(account_pnl_pct, 2))
 
     # Calculate summary metrics

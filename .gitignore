@@ -1,4 +1,4 @@
-﻿.env
+.env
 __pycache__/
 Dependencies/
 *.log
@@ -6,5 +6,7 @@ Dependencies/
 .agents/
 downloads/
 frontend/node_modules/
+frontend/dist/
+api-scrip-master.csv
 
 *.db
