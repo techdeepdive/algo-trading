@@ -687,7 +687,7 @@ def api_algolab_trade():
             dhan_client = dhanhq(dhan_context)
             
             resp = dhan_client.place_order(
-                security_id=str(tsl.get_security_id(symbol, "NSE")),
+                security_id=str(tsl._resolve_security_id(symbol, "NSE")),
                 exchange_segment=dhan_client.NSE,
                 transaction_type=dhan_client.BUY if transaction_type == "BUY" else dhan_client.SELL,
                 quantity=qty,
