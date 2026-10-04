@@ -716,7 +716,7 @@ def api_algolab_trade():
                 order_id = resp_data.get("orderId") or resp_data.get("data", {}).get("orderId", "AMO_PLACED")
             else:
                 error_msg = resp_data.get("remarks", {}).get("error_message", str(resp_data))
-                return jsonify({"status": "error", "message": f"Order rejected: {error_msg}"}), 400
+                return jsonify({"status": "error", "message": f"Order rejected: {error_msg} | Payload Sent: {str(payload)}"}), 400
 
                 
         else:
