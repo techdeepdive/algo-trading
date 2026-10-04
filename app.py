@@ -681,23 +681,43 @@ def api_algolab_trade():
         
         # Super Orders don't support AMO or CNC properly, so we use regular limit orders for those
         if is_amo or product_type == "CNC":
-            order_id = tsl.order_placement(
-                tradingsymbol=symbol,
-                exchange="NSE",
-                quantity=qty,
-                price=limit_price,
-                trigger_price=0,
-                order_type="LIMIT",
-                transaction_type=transaction_type,
-                trade_type="CNC" if product_type == "CNC" else "MIS",
-                after_market_order=True if is_amo else False
-            )
+            import requests
             
-            if order_id is None or order_id == "":
-                return jsonify({
-                    "status": "error",
-                    "message": f"Order rejected by broker. Attempted AMO/CNC order for {qty} {symbol} at {limit_price}"
-                }), 400
+            payload = {
+                "dhanClientId": client_id,
+                "transactionType": transaction_type,
+                "exchangeSegment": "NSE_EQ",
+                "productType": product_type,
+                "orderType": "LIMIT",
+                "validity": "DAY",
+                "securityId": str(tsl._resolve_security_id(symbol, "NSE")),
+                "quantity": qty,
+                "disclosedQuantity": 0,
+                "price": limit_price,
+                "triggerPrice": 0.0,
+                "afterMarketOrder": True if is_amo else False
+            }
+            
+            if is_amo:
+                payload["amoTime"] = "OPEN"
+                
+            headers = {
+                "Content-Type": "application/json",
+                "access-token": access_token
+            }
+            
+            resp = requests.post("https://api.dhan.co/v2/orders", json=payload, headers=headers)
+            try:
+                resp_data = resp.json()
+            except:
+                resp_data = {"status": "failure", "remarks": {"error_message": resp.text}}
+                
+            if resp_data.get("status") == "success" or resp_data.get("orderId"):
+                order_id = resp_data.get("orderId") or resp_data.get("data", {}).get("orderId", "AMO_PLACED")
+            else:
+                error_msg = resp_data.get("remarks", {}).get("error_message", str(resp_data))
+                return jsonify({"status": "error", "message": f"Order rejected: {error_msg}"}), 400
+
                 
         else:
             order_id = tsl.place_super_order(
