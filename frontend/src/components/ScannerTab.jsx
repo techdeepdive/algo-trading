@@ -85,7 +85,9 @@ export default function ScannerTab({ credentials }) {
       qty: Math.max(1, Math.floor(10000 / ltp)),
       price: limit.toFixed(2),
       sl: sl.toFixed(2),
-      tgt: tgt.toFixed(2)
+      tgt: tgt.toFixed(2),
+      product_type: 'MIS',
+      is_amo: false
     });
     setShowModal(true);
   };
@@ -110,7 +112,9 @@ export default function ScannerTab({ credentials }) {
           qty: parseInt(tradeForm.qty),
           price: parseFloat(tradeForm.price),
           sl: parseFloat(tradeForm.sl),
-          tgt: parseFloat(tradeForm.tgt)
+          tgt: parseFloat(tradeForm.tgt),
+          product_type: tradeForm.product_type,
+          is_amo: tradeForm.is_amo
         })
       });
       const data = await res.json();
@@ -475,9 +479,33 @@ export default function ScannerTab({ credentials }) {
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
           <div className="bg-slate-900 border border-slate-700 rounded-xl p-6 max-w-sm w-full shadow-2xl">
             <h3 className="text-xl font-bold text-white mb-1">Live Order: {tradeForm.symbol}</h3>
-            <p className="text-sm text-slate-400 mb-4">{tradeForm.trade_type} Super Order (MIS)</p>
+            <p className="text-sm text-slate-400 mb-4">{tradeForm.trade_type} Order</p>
             
             <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">Product Type</label>
+                  <select 
+                    value={tradeForm.product_type}
+                    onChange={(e) => setTradeForm({...tradeForm, product_type: e.target.value})}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:border-indigo-500"
+                  >
+                    <option value="MIS">MIS (Intraday)</option>
+                    <option value="CNC">CNC (Delivery)</option>
+                  </select>
+                </div>
+                <div className="flex items-center mt-6">
+                  <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
+                    <input 
+                      type="checkbox"
+                      checked={tradeForm.is_amo}
+                      onChange={(e) => setTradeForm({...tradeForm, is_amo: e.target.checked})}
+                      className="rounded bg-slate-950 border-slate-700 text-indigo-500 focus:ring-indigo-500 h-4 w-4"
+                    />
+                    After Market (AMO)
+                  </label>
+                </div>
+              </div>
               <div>
                 <label className="block text-xs font-medium text-slate-400 mb-1">Quantity</label>
                 <input 
@@ -555,6 +583,12 @@ export default function ScannerTab({ credentials }) {
                   </div>
                 </div>
               </div>
+              
+              {(tradeForm.product_type !== 'MIS' || tradeForm.is_amo) && (
+                <div className="text-xs text-amber-400 bg-amber-400/10 border border-amber-400/20 p-2 rounded">
+                  Note: SL and Target legs are not supported for CNC or AMO. Only the limit entry order will be placed.
+                </div>
+              )}
             </div>
             
             <div className="mt-6 flex justify-end gap-3">

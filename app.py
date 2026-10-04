@@ -667,6 +667,9 @@ def api_algolab_trade():
     tg_bot = data.get("tg_bot")
     tg_chat = data.get("tg_chat")
     
+    product_type = data.get("product_type", "MIS")
+    is_amo = data.get("is_amo", False)
+    
     if not client_id or not access_token:
         return jsonify({"status": "error", "message": "Dhan credentials required"}), 400
         
@@ -676,24 +679,48 @@ def api_algolab_trade():
         
         transaction_type = "BUY" if trade_type == "LONG" else "SELL"
         
-        order_id = tsl.place_super_order(
-            tradingsymbol=symbol, 
-            exchange="NSE",
-            transaction_type=transaction_type, 
-            quantity=qty,
-            order_type="LIMIT", 
-            trade_type="MIS",
-            price=limit_price, 
-            target_price=tgt,
-            stop_loss_price=sl,
-            trailing_jump=0.0
-        )
-        
-        if order_id is None or order_id == "":
-            return jsonify({
-                "status": "error",
-                "message": f"Order rejected by broker. This usually happens if the market is closed, margin is insufficient, or credentials expired. Attempted: {qty} {symbol} at {limit_price}"
-            }), 400
+        # Super Orders don't support AMO or CNC properly, so we use regular limit orders for those
+        if is_amo or product_type == "CNC":
+            # Direct underlying dhanhq object call for full flexibility
+            from dhanhq import dhanhq
+            resp = tsl.dhan.place_order(
+                security_id=str(tsl.get_security_id(symbol, "NSE")),
+                exchange_segment=dhanhq.NSE,
+                transaction_type=dhanhq.BUY if transaction_type == "BUY" else dhanhq.SELL,
+                quantity=qty,
+                order_type=dhanhq.LIMIT,
+                product_type=dhanhq.CNC if product_type == "CNC" else dhanhq.INTRA,
+                price=limit_price,
+                after_market_order=True if is_amo else False
+            )
+            
+            if resp.get("status") == "success":
+                order_id = resp.get("data", {}).get("orderId", "AMO_PLACED")
+            else:
+                order_id = ""
+                error_msg = resp.get("remarks", {}).get("error_message", "Unknown error")
+                return jsonify({"status": "error", "message": f"Order rejected: {error_msg}"}), 400
+                
+        else:
+            order_id = tsl.place_super_order(
+                tradingsymbol=symbol, 
+                exchange="NSE",
+                transaction_type=transaction_type, 
+                quantity=qty,
+                order_type="LIMIT", 
+                trade_type="MIS",
+                price=limit_price, 
+                target_price=tgt,
+                stop_loss_price=sl,
+                trailing_jump=0.0
+            )
+            
+            if order_id is None or order_id == "":
+                return jsonify({
+                    "status": "error",
+                    "message": f"Order rejected by broker. This usually happens if the market is closed, margin is insufficient, or credentials expired. Attempted: {qty} {symbol} at {limit_price}"
+                }), 400
+
             
         msg = f"LIVE TRADE: {transaction_type} {qty} {symbol} at {limit_price}. SL: {sl}, TGT: {tgt} (Order ID: {order_id})"
         if tg_bot and tg_chat:
