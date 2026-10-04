@@ -694,6 +694,7 @@ def api_algolab_trade():
                 order_type=dhan_client.LIMIT,
                 product_type=dhan_client.CNC if product_type == "CNC" else dhan_client.INTRA,
                 price=limit_price,
+                validity=dhan_client.DAY,
                 after_market_order=True if is_amo else False
             )
             
