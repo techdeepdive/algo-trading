@@ -687,7 +687,7 @@ def api_algolab_trade():
                 "dhanClientId": client_id,
                 "transactionType": transaction_type,
                 "exchangeSegment": "NSE_EQ",
-                "productType": product_type,
+                "productType": "CNC" if product_type == "CNC" else "INTRADAY",
                 "orderType": "LIMIT",
                 "validity": "DAY",
                 "securityId": str(tsl._resolve_security_id(symbol, "NSE")),
