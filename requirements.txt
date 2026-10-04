@@ -4,7 +4,7 @@ pandas
 flask
 gunicorn
 google-genai
-numpy<2
+numpy<2.1
 feedparser
 beautifulsoup4
 requests

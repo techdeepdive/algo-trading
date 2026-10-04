@@ -682,14 +682,17 @@ def api_algolab_trade():
         # Super Orders don't support AMO or CNC properly, so we use regular limit orders for those
         if is_amo or product_type == "CNC":
             # Direct underlying dhanhq object call for full flexibility
-            from dhanhq import dhanhq
-            resp = tsl.dhan.place_order(
+            from dhanhq import dhanhq, DhanContext
+            dhan_context = DhanContext(client_id, access_token)
+            dhan_client = dhanhq(dhan_context)
+            
+            resp = dhan_client.place_order(
                 security_id=str(tsl.get_security_id(symbol, "NSE")),
-                exchange_segment=dhanhq.NSE,
-                transaction_type=dhanhq.BUY if transaction_type == "BUY" else dhanhq.SELL,
+                exchange_segment=dhan_client.NSE,
+                transaction_type=dhan_client.BUY if transaction_type == "BUY" else dhan_client.SELL,
                 quantity=qty,
-                order_type=dhanhq.LIMIT,
-                product_type=dhanhq.CNC if product_type == "CNC" else dhanhq.INTRA,
+                order_type=dhan_client.LIMIT,
+                product_type=dhan_client.CNC if product_type == "CNC" else dhan_client.INTRA,
                 price=limit_price,
                 after_market_order=True if is_amo else False
             )
