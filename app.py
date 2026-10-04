@@ -681,29 +681,23 @@ def api_algolab_trade():
         
         # Super Orders don't support AMO or CNC properly, so we use regular limit orders for those
         if is_amo or product_type == "CNC":
-            # Direct underlying dhanhq object call for full flexibility
-            from dhanhq import dhanhq, DhanContext
-            dhan_context = DhanContext(client_id, access_token)
-            dhan_client = dhanhq(dhan_context)
-            
-            resp = dhan_client.place_order(
-                security_id=str(tsl._resolve_security_id(symbol, "NSE")),
-                exchange_segment=dhan_client.NSE,
-                transaction_type=dhan_client.BUY if transaction_type == "BUY" else dhan_client.SELL,
+            order_id = tsl.order_placement(
+                tradingsymbol=symbol,
+                exchange="NSE",
                 quantity=qty,
-                order_type=dhan_client.LIMIT,
-                product_type=dhan_client.CNC if product_type == "CNC" else dhan_client.INTRA,
                 price=limit_price,
-                validity=dhan_client.DAY,
+                trigger_price=0,
+                order_type="LIMIT",
+                transaction_type=transaction_type,
+                trade_type="CNC" if product_type == "CNC" else "MIS",
                 after_market_order=True if is_amo else False
             )
             
-            if resp.get("status") == "success":
-                order_id = resp.get("data", {}).get("orderId", "AMO_PLACED")
-            else:
-                order_id = ""
-                error_msg = resp.get("remarks", {}).get("error_message", "Unknown error")
-                return jsonify({"status": "error", "message": f"Order rejected: {error_msg}"}), 400
+            if order_id is None or order_id == "":
+                return jsonify({
+                    "status": "error",
+                    "message": f"Order rejected by broker. Attempted AMO/CNC order for {qty} {symbol} at {limit_price}"
+                }), 400
                 
         else:
             order_id = tsl.place_super_order(
