@@ -377,8 +377,8 @@ def backtest_hedging():
         else:
             client_id = data.get("client_id")
             dhan_pin = data.get("dhan_pin")
-    dhan_totp = data.get("dhan_totp")
-    access_token = data.get("access_token")
+            dhan_totp = data.get("dhan_totp")
+            access_token = data.get("access_token")
             symbol = data.get("symbol")
             expiry_flag = data.get("expiry_flag", "WEEK")
             from_date = data.get("from_date")
