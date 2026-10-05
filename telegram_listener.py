@@ -72,6 +72,7 @@ def telegram_polling_loop(client_id, dhan_pin, dhan_totp, tg_bot, tg_chat):
                     # Acknowledge the button click so it stops loading
                     requests.post(f"https://api.telegram.org/bot{tg_bot}/answerCallbackQuery", json={"callback_query_id": cb_id})
                     
+                    logger.info(f"Telegram Button Clicked: {action_data}")
                     if action_data.startswith("IGNORE"):
                         requests.post(f"https://api.telegram.org/bot{tg_bot}/editMessageText", json={
                             "chat_id": chat_id,
@@ -93,6 +94,7 @@ def telegram_polling_loop(client_id, dhan_pin, dhan_totp, tg_bot, tg_chat):
                             "text": f"⚙️ Executing {action} on {symbol} at {ltp} via AlgoScan..."
                         })
                         
+                        logger.info(f"Executing Telegram Order: {action} on {symbol} at {ltp}")
                         try:
                             # Fire raw limit order using Tradehull Token
                             payload = {
@@ -120,6 +122,7 @@ def telegram_polling_loop(client_id, dhan_pin, dhan_totp, tg_bot, tg_chat):
                                 txt = f"✅ {action} Order Placed for {symbol}!\nOrder ID: {o_data.get('orderId', 'N/A')}"
                             else:
                                 txt = f"❌ Order Failed: {o_data.get('remarks', o_data.get('errorMessage', 'Unknown'))}"
+                            logger.info(txt)
                                 
                             requests.post(f"https://api.telegram.org/bot{tg_bot}/editMessageText", json={
                                 "chat_id": chat_id,
