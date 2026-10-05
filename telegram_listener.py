@@ -94,32 +94,23 @@ def telegram_polling_loop(client_id, dhan_pin, dhan_totp, tg_bot, tg_chat):
                         })
                         
                         try:
-                            # Fire raw limit order using Tradehull Token
-                            payload = {
-                                "dhanClientId": client_id,
-                                "transactionType": action,
-                                "exchangeSegment": "NSE_EQ",
-                                "productType": "INTRADAY",
-                                "orderType": "LIMIT",
-                                "validity": "DAY",
-                                "securityId": str(tsl._resolve_security_id(symbol, "NSE")),
-                                "quantity": qty,
-                                "disclosedQuantity": 0,
-                                "price": ltp,
-                                "triggerPrice": 0.0,
-                                "afterMarketOrder": False
-                            }
-                            headers = {
-                                "Content-Type": "application/json",
-                                "access-token": tsl.token_id
-                            }
-                            order_resp = requests.post("https://api.dhan.co/v2/orders", json=payload, headers=headers)
-                            o_data = order_resp.json()
+                            # Fire limit order using Tradehull
+                            order_id = tsl.order_placement(
+                                tradingsymbol=symbol,
+                                exchange="NSE",
+                                quantity=qty,
+                                price=ltp,
+                                trigger_price=0,
+                                order_type="LIMIT",
+                                transaction_type=action,
+                                trade_type="MIS"
+                            )
                             
-                            if order_resp.status_code == 200 and o_data.get('orderStatus') != 'REJECTED':
-                                txt = f"✅ {action} Order Placed for {symbol}!\nOrder ID: {o_data.get('orderId', 'N/A')}"
+                            if order_id:
+                                txt = f"✅ {action} Order Placed for {symbol}!
+Order ID: {order_id}"
                             else:
-                                txt = f"❌ Order Failed: {o_data.get('remarks', o_data.get('errorMessage', 'Unknown'))}"
+                                txt = f"❌ Order Failed (rejected by broker)"
                                 
                             requests.post(f"https://api.telegram.org/bot{tg_bot}/editMessageText", json={
                                 "chat_id": chat_id,
