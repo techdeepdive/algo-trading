@@ -6,6 +6,7 @@ import pandas as pd
 import requests
 import os
 from Dhan_Tradehull import Tradehull
+from telegram_listener import start_telegram_listener, stop_telegram_listener, send_alert_with_buttons
 import logging
 
 IST = timezone(timedelta(hours=5, minutes=30))
@@ -298,7 +299,7 @@ def scanner_loop(client_id, access_token, dhan_pin=None, dhan_totp=None, tg_bot=
                     if status != 'OPEN' and tg_bot and tg_chat:
                         try:
                             msg = f"PAPER EXIT: {symbol} {t_type} {status}. PNL: ₹{pnl:.2f}. Exit Price: {ltp}"
-                            tsl.send_telegram_alert(message=msg, receiver_chat_id=tg_chat, bot_token=tg_bot)
+                            send_alert_with_buttons(bot_token=tg_bot, chat_id=tg_chat, text=msg, symbol=symbol, ltp=ltp)
                         except: pass
 
                 # Open new trades
@@ -325,7 +326,7 @@ def scanner_loop(client_id, access_token, dhan_pin=None, dhan_totp=None, tg_bot=
                         if tg_bot and tg_chat:
                             try:
                                 msg = f"PAPER ENTRY: {signal} {qty} {symbol} at {ltp}. SL: {sl:.2f}, TGT: {tgt:.2f}"
-                                tsl.send_telegram_alert(message=msg, receiver_chat_id=tg_chat, bot_token=tg_bot)
+                                send_alert_with_buttons(bot_token=tg_bot, chat_id=tg_chat, text=msg, symbol=symbol, ltp=ltp)
                             except: pass
 
             except Exception as e:
