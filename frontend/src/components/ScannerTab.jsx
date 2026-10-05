@@ -142,16 +142,7 @@ export default function ScannerTab({ credentials }) {
     }
   };
 
-  useEffect(() => {
-    // If strategy changes, stop engine if running and clear data
-    const handleStrategyChange = async () => {
-      if (engineRunning) {
-        await toggleEngine();
-      }
-      clearDatabase(true);
-    };
-    handleStrategyChange();
-  }, [selectedStrategy]);
+
 
   // Metrics calculation
   const openTrades = trades.filter(t => t.status === 'OPEN');
