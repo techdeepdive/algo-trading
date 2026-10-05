@@ -36,7 +36,7 @@ export default function ScannerTab({ credentials }) {
   }, []);
 
   const toggleEngine = async () => {
-    if (!credentials.client_id || !credentials.access_token) {
+    if (!credentials.client_id || !credentials.dhan_pin || !credentials.dhan_totp) {
       setError("Please save Dhan credentials in the Setup tab first.");
       return;
     }
@@ -50,7 +50,7 @@ export default function ScannerTab({ credentials }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           client_id: credentials.client_id,
-          access_token: credentials.access_token,
+          dhan_pin: credentials.dhan_pin, dhan_totp: credentials.dhan_totp,
           tg_bot: credentials.tg_bot,
           tg_chat: credentials.tg_chat,
           strategy_name: selectedStrategy,
@@ -93,7 +93,7 @@ export default function ScannerTab({ credentials }) {
   };
 
   const submitTrade = async () => {
-    if (!credentials.client_id || !credentials.access_token) {
+    if (!credentials.client_id || !credentials.dhan_pin || !credentials.dhan_totp) {
       setError("Please save Dhan credentials in the Setup tab first.");
       return;
     }
@@ -104,7 +104,7 @@ export default function ScannerTab({ credentials }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           client_id: credentials.client_id,
-          access_token: credentials.access_token,
+          dhan_pin: credentials.dhan_pin, dhan_totp: credentials.dhan_totp,
           tg_bot: credentials.tg_bot,
           tg_chat: credentials.tg_chat,
           symbol: tradeForm.symbol,

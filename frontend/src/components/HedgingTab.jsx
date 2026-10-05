@@ -59,7 +59,7 @@ export default function HedgingTab({ credentials }) {
   const getExchange = (sym) => ASSETS.find(a => a.symbol === sym)?.exchange || "INDEX";
 
   const downloadLegCsvs = async () => {
-    if (!credentials.client_id || !credentials.access_token) {
+    if (!credentials.client_id || !credentials.dhan_pin || !credentials.dhan_totp) {
       setError("Please fill in Dhan credentials on the Home tab first.");
       return;
     }
@@ -124,7 +124,7 @@ export default function HedgingTab({ credentials }) {
   };
 
   const runSimulation = async () => {
-    if (!credentials.client_id || !credentials.access_token) {
+    if (!credentials.client_id || !credentials.dhan_pin || !credentials.dhan_totp) {
       setError('Client ID and Access Token required.');
       return;
     }
@@ -159,7 +159,7 @@ export default function HedgingTab({ credentials }) {
   };
 
   const runBacktest = async () => {
-    if (!credentials.client_id || !credentials.access_token) {
+    if (!credentials.client_id || !credentials.dhan_pin || !credentials.dhan_totp) {
       setError('Client ID and Access Token required.');
       return;
     }

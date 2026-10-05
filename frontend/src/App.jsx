@@ -13,7 +13,8 @@ function App() {
   const [activeTab, setActiveTab] = useState('home');
   const [credentials, setCredentials] = useState({
     client_id: '',
-    access_token: '',
+    dhan_pin: '',
+    dhan_totp: '',
     tg_bot: '',
     tg_chat: '',
     gemini_key: ''
@@ -81,7 +82,8 @@ function App() {
             <div className="space-y-3">
               {[
                 { name: 'client_id', label: 'Dhan Client ID *', placeholder: 'e.g. 1100XXXX' },
-                { name: 'access_token', label: 'Dhan Access Token *', placeholder: 'Paste your token', type: 'password' },
+                { name: 'dhan_pin', label: 'Dhan 6-Digit PIN *', placeholder: 'e.g. 123456', type: 'password' },
+                { name: 'dhan_totp', label: 'Dhan TOTP Secret *', placeholder: 'Paste Google Auth Secret', type: 'password' },
                 { separator: true },
                 { name: 'tg_bot', label: 'Telegram Bot Token', placeholder: 'From @BotFather', type: 'password' },
                 { name: 'tg_chat', label: 'Telegram Chat ID', placeholder: 'Your Chat ID', type: 'password' },

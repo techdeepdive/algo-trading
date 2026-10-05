@@ -151,7 +151,7 @@ def compute_signals(df, strategy_name='WPR_CROSS_EMA'):
 
     return signal, indicators
 
-def run_screener(client_id, access_token, strategy_name='WPR_CROSS_EMA', watchlists=None, custom_symbols=None):
+def run_screener(client_id, access_token, dhan_pin=None, dhan_totp=None, strategy_name='WPR_CROSS_EMA', watchlists=None, custom_symbols=None):
     if watchlists is None:
         watchlists = ['nifty50']
     
@@ -171,7 +171,7 @@ def run_screener(client_id, access_token, strategy_name='WPR_CROSS_EMA', watchli
     results = []
 
     try:
-        tsl = Tradehull(client_id, access_token, mode="access_token")
+        tsl = Tradehull(client_id, mode="pin_totp", pin=dhan_pin, totp_secret=dhan_totp) if dhan_pin and dhan_totp else Tradehull(client_id, access_token, mode="access_token")
     except Exception as e:
         logger.error(f"Failed to init Tradehull for screener: {e}")
         return {"status": "error", "message": f"Dhan Login Failed: {e}"}
@@ -201,7 +201,7 @@ def run_screener(client_id, access_token, strategy_name='WPR_CROSS_EMA', watchli
     return {"status": "success", "data": results}
 
 
-def scanner_loop(client_id, access_token, tg_bot=None, tg_chat=None, strategy_name='WPR_CROSS_EMA', watchlists=None, custom_symbols=None):
+def scanner_loop(client_id, access_token, dhan_pin=None, dhan_totp=None, tg_bot=None, tg_chat=None, strategy_name='WPR_CROSS_EMA', watchlists=None, custom_symbols=None):
     global _scanner_running
     
     if watchlists is None:
@@ -237,7 +237,7 @@ def scanner_loop(client_id, access_token, tg_bot=None, tg_chat=None, strategy_na
             logger.error(f"Failed to download instrument master: {e}")
 
     try:
-        tsl = Tradehull(client_id, access_token, mode="access_token")
+        tsl = Tradehull(client_id, mode="pin_totp", pin=dhan_pin, totp_secret=dhan_totp) if dhan_pin and dhan_totp else Tradehull(client_id, access_token, mode="access_token")
     except Exception as e:
         logger.error(f"Failed to init Tradehull: {e}")
         _scanner_running = False
@@ -341,14 +341,14 @@ def scanner_loop(client_id, access_token, tg_bot=None, tg_chat=None, strategy_na
                 break
             time.sleep(1)
 
-def start_scanner(client_id, access_token, tg_bot=None, tg_chat=None, strategy_name='WPR_CROSS_EMA', watchlists=None, custom_symbols=None):
+def start_scanner(client_id, access_token, dhan_pin=None, dhan_totp=None, tg_bot=None, tg_chat=None, strategy_name='WPR_CROSS_EMA', watchlists=None, custom_symbols=None):
     global _scanner_thread, _scanner_running
     if _scanner_running:
         return {"status": "success", "message": "Scanner already running"}
         
     init_db()
     _scanner_running = True
-    _scanner_thread = threading.Thread(target=scanner_loop, args=(client_id, access_token, tg_bot, tg_chat, strategy_name, watchlists, custom_symbols))
+    _scanner_thread = threading.Thread(target=scanner_loop, args=(client_id, access_token, dhan_pin, dhan_totp, tg_bot, tg_chat, strategy_name, watchlists, custom_symbols))
     _scanner_thread.daemon = True
     _scanner_thread.start()
     return {"status": "success", "message": "Scanner started"}

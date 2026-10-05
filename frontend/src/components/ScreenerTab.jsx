@@ -21,7 +21,7 @@ export default function ScreenerTab({ credentials }) {
   const [tradeForm, setTradeForm] = useState(null);
 
   const runScreener = async () => {
-    if (!credentials.client_id || !credentials.access_token) {
+    if (!credentials.client_id || !credentials.dhan_pin || !credentials.dhan_totp) {
       setError("Please save Dhan credentials in the Setup tab first.");
       return;
     }
@@ -35,7 +35,7 @@ export default function ScreenerTab({ credentials }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           client_id: credentials.client_id,
-          access_token: credentials.access_token,
+          dhan_pin: credentials.dhan_pin, dhan_totp: credentials.dhan_totp,
           strategy_name: selectedStrategy,
           watchlists: watchlists,
           custom_symbols: customSymbols
@@ -82,7 +82,7 @@ export default function ScreenerTab({ credentials }) {
   };
 
   const submitTrade = async () => {
-    if (!credentials.client_id || !credentials.access_token) {
+    if (!credentials.client_id || !credentials.dhan_pin || !credentials.dhan_totp) {
       setError("Please save Dhan credentials in the Setup tab first.");
       return;
     }
@@ -93,7 +93,7 @@ export default function ScreenerTab({ credentials }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           client_id: credentials.client_id,
-          access_token: credentials.access_token,
+          dhan_pin: credentials.dhan_pin, dhan_totp: credentials.dhan_totp,
           ...tradeForm
         })
       });

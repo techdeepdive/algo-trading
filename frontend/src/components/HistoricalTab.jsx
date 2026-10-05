@@ -40,7 +40,7 @@ export default function HistoricalTab({ credentials }) {
   }, [symbol, assetType]);
 
   const downloadHistorical = async () => {
-    if (!credentials.client_id || !credentials.access_token) {
+    if (!credentials.client_id || !credentials.dhan_pin || !credentials.dhan_totp) {
       setError('Client ID and Access Token are required.');
       return;
     }

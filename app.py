@@ -109,11 +109,13 @@ def scan():
     data = request.json
     
     client_id = data.get("client_id")
+    dhan_pin = data.get("dhan_pin")
+    dhan_totp = data.get("dhan_totp")
     access_token = data.get("access_token")
     tg_bot = data.get("tg_bot")
     tg_chat = data.get("tg_chat")
     
-    if not client_id or not access_token:
+    if not client_id or (not access_token and (not dhan_pin or not dhan_totp)):
         return jsonify({"status": "error", "message": "Client ID and Access Token are required."}), 400
         
     result = run_scan(client_id, access_token, tg_bot, tg_chat)
@@ -143,6 +145,8 @@ def symbols():
 def historical():
     data = request.json
     client_id = data.get("client_id")
+    dhan_pin = data.get("dhan_pin")
+    dhan_totp = data.get("dhan_totp")
     access_token = data.get("access_token")
     symbol = data.get("symbol", "").strip()
     from_date = data.get("from_date", "").strip()
@@ -155,7 +159,7 @@ def historical():
     strike = data.get("strike", "ATM")
     option_type = data.get("option_type", "CALL")
 
-    if not client_id or not access_token:
+    if not client_id or (not access_token and (not dhan_pin or not dhan_totp)):
         return jsonify({"status": "error", "message": "Client ID and Access Token are required."}), 400
     if not symbol:
         return jsonify({"status": "error", "message": "Symbol is required."}), 400
@@ -164,7 +168,7 @@ def historical():
     exchange = exchange_override if exchange_override else _detect_exchange(symbol)
 
     try:
-        tsl = Tradehull(client_id, access_token, mode="access_token")
+        tsl = Tradehull(client_id, mode="pin_totp", pin=dhan_pin, totp_secret=dhan_totp) if dhan_pin and dhan_totp else Tradehull(client_id, access_token, mode="access_token")
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 400
 
@@ -281,13 +285,15 @@ def download_file(filename):
 def simulate_hedging():
     data = request.json
     client_id = data.get("client_id")
+    dhan_pin = data.get("dhan_pin")
+    dhan_totp = data.get("dhan_totp")
     access_token = data.get("access_token")
     symbol = data.get("symbol")
     strategy = data.get("strategy")
     exchange = data.get("exchange", "INDEX")
 
     try:
-        tsl = Tradehull(client_id, access_token, mode="access_token")
+        tsl = Tradehull(client_id, mode="pin_totp", pin=dhan_pin, totp_secret=dhan_totp) if dhan_pin and dhan_totp else Tradehull(client_id, access_token, mode="access_token")
         result = get_strategy_payoff(tsl, symbol, exchange, strategy)
         return jsonify({"status": "success", "data": result})
     except Exception as e:
@@ -370,7 +376,9 @@ def backtest_hedging():
             result = run_hedging_backtest_from_csv(df, strategy, slippage, capital, qty_multiplier, sl_pct, tp_pct)
         else:
             client_id = data.get("client_id")
-            access_token = data.get("access_token")
+            dhan_pin = data.get("dhan_pin")
+    dhan_totp = data.get("dhan_totp")
+    access_token = data.get("access_token")
             symbol = data.get("symbol")
             expiry_flag = data.get("expiry_flag", "WEEK")
             from_date = data.get("from_date")
@@ -378,7 +386,7 @@ def backtest_hedging():
             timeframe = data.get("timeframe", "15")
             exchange = data.get("exchange", "INDEX")
 
-            tsl = Tradehull(client_id, access_token, mode="access_token")
+            tsl = Tradehull(client_id, mode="pin_totp", pin=dhan_pin, totp_secret=dhan_totp) if dhan_pin and dhan_totp else Tradehull(client_id, access_token, mode="access_token")
             result = run_hedging_backtest(tsl, symbol, exchange, strategy, expiry_flag, from_date, to_date, timeframe, slippage, capital, qty_multiplier, sl_pct, tp_pct)
             
         return jsonify({"status": "success", "data": result})
@@ -390,6 +398,8 @@ def backtest_hedging():
 def download_leg_csv():
     data = request.json
     client_id = data.get("client_id")
+    dhan_pin = data.get("dhan_pin")
+    dhan_totp = data.get("dhan_totp")
     access_token = data.get("access_token")
     symbol = data.get("symbol")
     strategy = data.get("strategy")
@@ -401,7 +411,7 @@ def download_leg_csv():
     exchange = data.get("exchange", "INDEX")
 
     try:
-        tsl = Tradehull(client_id, access_token, mode="access_token")
+        tsl = Tradehull(client_id, mode="pin_totp", pin=dhan_pin, totp_secret=dhan_totp) if dhan_pin and dhan_totp else Tradehull(client_id, access_token, mode="access_token")
         from hedging_backtester import STRATEGIES
         if strategy not in STRATEGIES:
             return jsonify({"status": "error", "message": "Invalid strategy"}), 400
@@ -523,6 +533,8 @@ def api_news():
     data = request.json
     gemini_key = data.get("gemini_key")
     client_id = data.get("client_id")
+    dhan_pin = data.get("dhan_pin")
+    dhan_totp = data.get("dhan_totp")
     access_token = data.get("access_token")
     
     if not gemini_key:
@@ -535,9 +547,9 @@ def api_news():
         return jsonify({"status": "error", "message": f"Failed to init Gemini: {e}"}), 400
         
     tsl = None
-    if client_id and access_token:
+    if client_id and (access_token or (dhan_pin and dhan_totp)):
         try:
-            tsl = Tradehull(client_id, access_token, mode="access_token")
+            tsl = Tradehull(client_id, mode="pin_totp", pin=dhan_pin, totp_secret=dhan_totp) if dhan_pin and dhan_totp else Tradehull(client_id, access_token, mode="access_token")
         except:
             pass
 
@@ -618,28 +630,32 @@ from scanner_backend import start_scanner, stop_scanner, get_dashboard_state, ru
 def api_algolab_screen():
     data = request.json
     client_id = data.get("client_id")
+    dhan_pin = data.get("dhan_pin")
+    dhan_totp = data.get("dhan_totp")
     access_token = data.get("access_token")
     strategy_name = data.get("strategy_name", "WPR_CROSS_EMA")
     watchlists = data.get("watchlists", ["nifty50"])
     custom_symbols = data.get("custom_symbols", "")
-    if not client_id or not access_token:
+    if not client_id or (not access_token and (not dhan_pin or not dhan_totp)):
         return jsonify({"status": "error", "message": "Dhan credentials required"}), 400
-    res = run_screener(client_id, access_token, strategy_name, watchlists, custom_symbols)
+    res = run_screener(client_id, access_token, dhan_pin, dhan_totp, strategy_name, watchlists, custom_symbols)
     return jsonify(res)
 
 @app.route("/api/algolab/start", methods=["POST"])
 def api_algolab_start():
     data = request.json
     client_id = data.get("client_id")
+    dhan_pin = data.get("dhan_pin")
+    dhan_totp = data.get("dhan_totp")
     access_token = data.get("access_token")
     tg_bot = data.get("tg_bot")
     tg_chat = data.get("tg_chat")
     strategy_name = data.get("strategy_name", "WPR_CROSS_EMA")
     watchlists = data.get("watchlists", ["nifty50"])
     custom_symbols = data.get("custom_symbols", "")
-    if not client_id or not access_token:
+    if not client_id or (not access_token and (not dhan_pin or not dhan_totp)):
         return jsonify({"status": "error", "message": "Dhan credentials required"}), 400
-    res = start_scanner(client_id, access_token, tg_bot, tg_chat, strategy_name, watchlists, custom_symbols)
+    res = start_scanner(client_id, access_token, dhan_pin, dhan_totp, tg_bot, tg_chat, strategy_name, watchlists, custom_symbols)
     return jsonify(res)
 
 @app.route("/api/algolab/stop", methods=["POST"])
@@ -670,6 +686,8 @@ def api_algolab_clear():
 def api_algolab_trade():
     data = request.json
     client_id = data.get("client_id")
+    dhan_pin = data.get("dhan_pin")
+    dhan_totp = data.get("dhan_totp")
     access_token = data.get("access_token")
     symbol = data.get("symbol")
     trade_type = data.get("trade_type", "LONG")
@@ -683,12 +701,12 @@ def api_algolab_trade():
     product_type = data.get("product_type", "MIS")
     is_amo = data.get("is_amo", False)
     
-    if not client_id or not access_token:
+    if not client_id or (not access_token and (not dhan_pin or not dhan_totp)):
         return jsonify({"status": "error", "message": "Dhan credentials required"}), 400
         
     try:
         from Dhan_Tradehull import Tradehull
-        tsl = Tradehull(client_id, access_token, mode="access_token")
+        tsl = Tradehull(client_id, mode="pin_totp", pin=dhan_pin, totp_secret=dhan_totp) if dhan_pin and dhan_totp else Tradehull(client_id, access_token, mode="access_token")
         
         transaction_type = "BUY" if trade_type == "LONG" else "SELL"
         

@@ -7,7 +7,7 @@ export default function HomeTab({ credentials }) {
   const [error, setError] = useState(null);
 
   const runScan = async () => {
-    if (!credentials.client_id || !credentials.access_token) {
+    if (!credentials.client_id || !credentials.dhan_pin || !credentials.dhan_totp) {
       setError("Please provide Dhan credentials first.");
       return;
     }
