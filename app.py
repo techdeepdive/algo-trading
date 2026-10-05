@@ -612,7 +612,20 @@ def api_news():
             
     return jsonify({"status": "success", "news": results})
 
-from scanner_backend import start_scanner, stop_scanner, get_dashboard_state
+from scanner_backend import start_scanner, stop_scanner, get_dashboard_state, run_screener
+
+@app.route("/api/algolab/screen", methods=["POST"])
+def api_algolab_screen():
+    data = request.json
+    client_id = data.get("client_id")
+    access_token = data.get("access_token")
+    strategy_name = data.get("strategy_name", "WPR_CROSS_EMA")
+    watchlists = data.get("watchlists", ["nifty50"])
+    custom_symbols = data.get("custom_symbols", "")
+    if not client_id or not access_token:
+        return jsonify({"status": "error", "message": "Dhan credentials required"}), 400
+    res = run_screener(client_id, access_token, strategy_name, watchlists, custom_symbols)
+    return jsonify(res)
 
 @app.route("/api/algolab/start", methods=["POST"])
 def api_algolab_start():

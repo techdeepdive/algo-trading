@@ -7,6 +7,8 @@ import HedgingTab from './components/HedgingTab';
 import NewsTab from './components/NewsTab';
 import ScannerTab from './components/ScannerTab';
 
+import ScreenerTab from './components/ScreenerTab';
+
 function App() {
   const [activeTab, setActiveTab] = useState('home');
   const [credentials, setCredentials] = useState({
@@ -36,6 +38,7 @@ function App() {
     { id: 'backtest', label: 'Backtesting', icon: Activity },
     { id: 'hedging', label: 'Hedging', icon: ShieldCheck },
     { id: 'scanner', label: 'Live Trade', icon: Activity },
+    { id: 'screener', label: 'Screener', icon: Activity },
     { id: 'news', label: 'Market News (AI)', icon: Newspaper },
   ];
 
@@ -109,6 +112,7 @@ function App() {
           {activeTab === 'backtest' && <BacktestTab credentials={credentials} />}
           {activeTab === 'hedging' && <HedgingTab credentials={credentials} />}
           {activeTab === 'scanner' && <ScannerTab credentials={credentials} />}
+          {activeTab === 'screener' && <ScreenerTab credentials={credentials} />}
           {activeTab === 'news' && <NewsTab credentials={credentials} />}
         </div>
       </div>

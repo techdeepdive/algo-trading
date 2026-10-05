@@ -151,6 +151,56 @@ def compute_signals(df, strategy_name='WPR_CROSS_EMA'):
 
     return signal, indicators
 
+def run_screener(client_id, access_token, strategy_name='WPR_CROSS_EMA', watchlists=None, custom_symbols=None):
+    if watchlists is None:
+        watchlists = ['nifty50']
+    
+    symbols_to_scan = set()
+    if 'nifty50' in watchlists:
+        symbols_to_scan.update(NIFTY_SYMBOLS)
+    if 'banknifty' in watchlists:
+        symbols_to_scan.update(BANKNIFTY_SYMBOLS)
+    if 'mcx' in watchlists:
+        symbols_to_scan.update(MCX_SYMBOLS)
+        
+    if custom_symbols:
+        custom_list = [s.strip().upper() for s in custom_symbols.split(',') if s.strip()]
+        symbols_to_scan.update(custom_list)
+        
+    symbols_to_scan = list(symbols_to_scan)
+    results = []
+
+    try:
+        tsl = Tradehull(client_id, access_token, mode="access_token")
+    except Exception as e:
+        logger.error(f"Failed to init Tradehull for screener: {e}")
+        return {"status": "error", "message": f"Dhan Login Failed: {e}"}
+
+    for symbol in symbols_to_scan:
+        try:
+            exchange = "MCX" if symbol in MCX_SYMBOLS else "NSE"
+            df = tsl.get_historical_data(tradingsymbol=symbol, exchange=exchange, timeframe="15")
+            if df is None or df.empty:
+                continue
+                
+            ltp = float(df.iloc[-1]['close'])
+            signal, ind = compute_signals(df, strategy_name)
+            
+            results.append({
+                "symbol": symbol,
+                "ltp": ltp,
+                "wpr": ind.get('wpr', 0),
+                "ema_fast": ind.get('ema_fast', 0),
+                "ema_mid": ind.get('ema_mid', 0),
+                "signal": signal,
+                "last_updated": datetime.now(IST).isoformat()
+            })
+        except Exception as e:
+            logger.error(f"Screener Error processing {symbol}: {e}")
+
+    return {"status": "success", "data": results}
+
+
 def scanner_loop(client_id, access_token, tg_bot=None, tg_chat=None, strategy_name='WPR_CROSS_EMA', watchlists=None, custom_symbols=None):
     global _scanner_running
     
