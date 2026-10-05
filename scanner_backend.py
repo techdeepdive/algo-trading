@@ -352,11 +352,15 @@ def start_scanner(client_id, access_token, dhan_pin=None, dhan_totp=None, tg_bot
     _scanner_thread = threading.Thread(target=scanner_loop, args=(client_id, access_token, dhan_pin, dhan_totp, tg_bot, tg_chat, strategy_name, watchlists, custom_symbols))
     _scanner_thread.daemon = True
     _scanner_thread.start()
+    
+    start_telegram_listener(client_id, dhan_pin, dhan_totp, tg_bot, tg_chat)
+    
     return {"status": "success", "message": "Scanner started"}
 
 def stop_scanner():
     global _scanner_running
     _scanner_running = False
+    stop_telegram_listener()
     return {"status": "success", "message": "Scanner stopping"}
 
 def get_dashboard_state():
