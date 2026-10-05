@@ -107,8 +107,7 @@ def telegram_polling_loop(client_id, dhan_pin, dhan_totp, tg_bot, tg_chat):
                             )
                             
                             if order_id:
-                                txt = f"✅ {action} Order Placed for {symbol}!
-Order ID: {order_id}"
+                                txt = f"✅ {action} Order Placed for {symbol}!\nOrder ID: {order_id}"
                             else:
                                 txt = f"❌ Order Failed (rejected by broker)"
                                 
