@@ -707,6 +707,7 @@ def api_algoscan_trade():
     try:
         from Dhan_Tradehull import Tradehull
         tsl = Tradehull(client_id, mode="pin_totp", pin=dhan_pin, totp_secret=dhan_totp) if dhan_pin and dhan_totp else Tradehull(client_id, access_token, mode="access_token")
+        access_token = tsl.token_id
         
         transaction_type = "BUY" if trade_type == "LONG" else "SELL"
         
