@@ -626,8 +626,8 @@ def api_news():
 
 from scanner_backend import start_scanner, stop_scanner, get_dashboard_state, run_screener
 
-@app.route("/api/algolab/screen", methods=["POST"])
-def api_algolab_screen():
+@app.route("/api/algoscan/screen", methods=["POST"])
+def api_algoscan_screen():
     data = request.json
     client_id = data.get("client_id")
     dhan_pin = data.get("dhan_pin")
@@ -641,8 +641,8 @@ def api_algolab_screen():
     res = run_screener(client_id, access_token, dhan_pin, dhan_totp, strategy_name, watchlists, custom_symbols)
     return jsonify(res)
 
-@app.route("/api/algolab/start", methods=["POST"])
-def api_algolab_start():
+@app.route("/api/algoscan/start", methods=["POST"])
+def api_algoscan_start():
     data = request.json
     client_id = data.get("client_id")
     dhan_pin = data.get("dhan_pin")
@@ -658,18 +658,18 @@ def api_algolab_start():
     res = start_scanner(client_id, access_token, dhan_pin, dhan_totp, tg_bot, tg_chat, strategy_name, watchlists, custom_symbols)
     return jsonify(res)
 
-@app.route("/api/algolab/stop", methods=["POST"])
-def api_algolab_stop():
+@app.route("/api/algoscan/stop", methods=["POST"])
+def api_algoscan_stop():
     res = stop_scanner()
     return jsonify(res)
 
-@app.route("/api/algolab/state", methods=["GET"])
-def api_algolab_state():
+@app.route("/api/algoscan/state", methods=["GET"])
+def api_algoscan_state():
     res = get_dashboard_state()
     return jsonify(res)
 
-@app.route("/api/algolab/clear", methods=["POST"])
-def api_algolab_clear():
+@app.route("/api/algoscan/clear", methods=["POST"])
+def api_algoscan_clear():
     try:
         import sqlite3
         conn = sqlite3.connect('algo_lab.db')
@@ -682,8 +682,8 @@ def api_algolab_clear():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
-@app.route("/api/algolab/trade", methods=["POST"])
-def api_algolab_trade():
+@app.route("/api/algoscan/trade", methods=["POST"])
+def api_algoscan_trade():
     data = request.json
     client_id = data.get("client_id")
     dhan_pin = data.get("dhan_pin")

@@ -17,7 +17,7 @@ export default function ScannerTab({ credentials }) {
   useEffect(() => {
     const fetchState = async () => {
       try {
-        const res = await fetch('/api/algolab/state');
+        const res = await fetch('/api/algoscan/state');
         const data = await res.json();
         if (data.status === 'success') {
           setEngineRunning(data.is_running);
@@ -44,7 +44,7 @@ export default function ScannerTab({ credentials }) {
     setLoading(true);
     setError(null);
     try {
-      const endpoint = engineRunning ? '/api/algolab/stop' : '/api/algolab/start';
+      const endpoint = engineRunning ? '/api/algoscan/stop' : '/api/algoscan/start';
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -99,7 +99,7 @@ export default function ScannerTab({ credentials }) {
     }
     setLoading(true);
     try {
-      const res = await fetch('/api/algolab/trade', {
+      const res = await fetch('/api/algoscan/trade', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -134,7 +134,7 @@ export default function ScannerTab({ credentials }) {
   const clearDatabase = async (force = false) => {
     if (!force && !window.confirm("Are you sure you want to clear all scanner data and paper trades?")) return;
     try {
-      await fetch('/api/algolab/clear', { method: 'POST' });
+      await fetch('/api/algoscan/clear', { method: 'POST' });
       setScanState([]);
       setTrades([]);
     } catch (err) {

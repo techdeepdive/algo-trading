@@ -30,7 +30,7 @@ export default function ScreenerTab({ credentials }) {
     setError(null);
     setResults([]);
     try {
-      const res = await fetch('/api/algolab/screen', {
+      const res = await fetch('/api/algoscan/screen', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -88,7 +88,7 @@ export default function ScreenerTab({ credentials }) {
     }
     setLoading(true);
     try {
-      const res = await fetch('/api/algolab/trade', {
+      const res = await fetch('/api/algoscan/trade', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -1,3 +1,3 @@
 #!/bin/bash
-sudo systemctl stop algolab
-echo "AlgoLab Trading Server has been stopped!"
+sudo systemctl stop algoscan
+echo "AlgoScan Trading Server has been stopped!"
