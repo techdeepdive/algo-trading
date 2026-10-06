@@ -10,8 +10,6 @@ def cleanup_old_csvs():
         try: os.remove(f)
         except: pass
 
-cleanup_old_csvs()
-
 import threading
 import time
 from datetime import datetime, timezone, timedelta
@@ -251,6 +249,7 @@ def scanner_loop(client_id, access_token, dhan_pin=None, dhan_totp=None, tg_bot=
             logger.error(f"Failed to download instrument master: {e}")
 
     try:
+        cleanup_old_csvs()
         tsl = Tradehull(client_id, mode="pin_totp", pin=dhan_pin, totp_secret=dhan_totp) if dhan_pin and dhan_totp else Tradehull(client_id, access_token, mode="access_token")
     except Exception as e:
         logger.error(f"Failed to init Tradehull: {e}")
