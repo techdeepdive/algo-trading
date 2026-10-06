@@ -136,6 +136,23 @@ def telegram_polling_loop(client_id, dhan_pin, dhan_totp, tg_bot, tg_chat):
                             
                             if order_resp.status_code == 200 and o_data.get('orderStatus') != 'REJECTED':
                                 txt = f"✅ {action} Order Placed for {symbol}!\nOrder ID: {o_data.get('orderId', 'N/A')}"
+                                
+                                # Attach Forever Order (GTT OCO) for Longterm trades (CNC)
+                                if action == "BUY":
+                                    tgt_trigger = round(ltp * 1.03, 1)
+                                    sl_trigger = round(ltp * 0.97, 1)
+                                    try:
+                                        fid = tsl.place_forever_order(
+                                            tradingsymbol=symbol, exchange=target_exchange,
+                                            transaction_type="SELL", quantity=qty,
+                                            order_type="LIMIT", trade_type="CNC",
+                                            price=tgt_trigger, trigger_price=tgt_trigger,
+                                            order_flag="OCO",
+                                            quantity_1=qty, price_1=sl_trigger, trigger_price_1=sl_trigger
+                                        )
+                                        txt += f"\n🎯 Target & SL (GTT) placed!\nGTT ID: {fid}"
+                                    except Exception as e:
+                                        txt += f"\n⚠️ GTT Failed: {str(e)}"
                             else:
                                 txt = f"❌ Order Failed: {o_data.get('remarks', o_data.get('errorMessage', 'Unknown'))}"
                             logger.info(txt)

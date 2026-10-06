@@ -746,6 +746,21 @@ def api_algoscan_trade():
                 
             if resp_data.get("status") == "success" or resp_data.get("orderId"):
                 order_id = resp_data.get("orderId") or resp_data.get("data", {}).get("orderId", "AMO_PLACED")
+                
+                # Attach Forever Order (GTT OCO) if SL and TGT are provided for a Delivery (CNC) BUY
+                if product_type == "CNC" and transaction_type == "BUY" and sl > 0 and tgt > 0:
+                    try:
+                        fid = tsl.place_forever_order(
+                            tradingsymbol=symbol, exchange="NSE",
+                            transaction_type="SELL", quantity=qty,
+                            order_type="LIMIT", trade_type="CNC",
+                            price=tgt, trigger_price=tgt,
+                            order_flag="OCO",
+                            quantity_1=qty, price_1=sl, trigger_price_1=sl
+                        )
+                        order_id = f"{order_id} + GTT:{fid}"
+                    except Exception as e:
+                        print(f"GTT Failed: {e}")
             else:
                 error_msg = resp_data.get("remarks", {}).get("error_message", str(resp_data))
                 return jsonify({"status": "error", "message": f"Order rejected: {error_msg} | Payload Sent: {str(payload)}"}), 400
