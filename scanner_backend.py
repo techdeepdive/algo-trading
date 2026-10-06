@@ -224,7 +224,7 @@ def scanner_loop(client_id, access_token, dhan_pin=None, dhan_totp=None, tg_bot=
     
     # Pre-download the instrument master to bypass Render/Cloudflare blocking default Python User-Agents
     csv_file = 'api-scrip-master.csv'
-    if not os.path.exists(csv_file) or os.path.getsize(csv_file) < 1000:
+    if True: # Always force download daily
         logger.info(f"Downloading {csv_file} with custom User-Agent...")
         try:
             url = 'https://images.dhan.co/api-data/api-scrip-master.csv'

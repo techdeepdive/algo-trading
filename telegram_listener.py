@@ -39,6 +39,9 @@ def telegram_polling_loop(client_id, dhan_pin, dhan_totp, tg_bot, tg_chat):
     tsl = None
     try:
         tsl = Tradehull(client_id, mode="pin_totp", pin=dhan_pin, totp_secret=dhan_totp)
+        import os, pandas as pd
+        if os.path.exists('api-scrip-master.csv'):
+            tsl.instrument_df = pd.read_csv('api-scrip-master.csv', low_memory=False)
     except Exception as e:
         logger.error(f"Failed to init Tradehull for Telegram bot: {e}")
         return
@@ -97,6 +100,8 @@ def telegram_polling_loop(client_id, dhan_pin, dhan_totp, tg_bot, tg_chat):
                         logger.info(f"Executing Telegram Order: {action} on {symbol} at {ltp}")
                         try:
                             # Fire raw limit order using Tradehull Token
+                            sec_id = str(tsl._resolve_security_id(symbol, "NSE"))
+                            logger.info(f"Resolved Security ID for {symbol}: {sec_id}")
                             payload = {
                                 "dhanClientId": client_id,
                                 "transactionType": action,
@@ -104,7 +109,7 @@ def telegram_polling_loop(client_id, dhan_pin, dhan_totp, tg_bot, tg_chat):
                                 "productType": "INTRADAY",
                                 "orderType": "LIMIT",
                                 "validity": "DAY",
-                                "securityId": str(tsl._resolve_security_id(symbol, "NSE")),
+                                "securityId": sec_id,
                                 "quantity": qty,
                                 "disclosedQuantity": 0,
                                 "price": ltp,
