@@ -38,7 +38,7 @@ def telegram_polling_loop(client_id, dhan_pin, dhan_totp, tg_bot, tg_chat):
     # Init Tradehull instance for telegram orders
     tsl = None
     try:
-                tsl = Tradehull(client_id, mode="pin_totp", pin=dhan_pin, totp_secret=dhan_totp)
+        tsl = Tradehull(client_id, mode="pin_totp", pin=dhan_pin, totp_secret=dhan_totp)
         import os, pandas as pd
         if os.path.exists('api-scrip-master.csv'):
             tsl.instrument_df = pd.read_csv('api-scrip-master.csv', low_memory=False)
