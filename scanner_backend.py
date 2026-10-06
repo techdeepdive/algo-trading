@@ -1,4 +1,17 @@
 import sqlite3
+
+def cleanup_old_csvs():
+    import glob, os
+    # Clean up Tradehull's buggy windows-path files on Linux
+    for f in glob.glob('*all_instrument*.csv'):
+        try: os.remove(f)
+        except: pass
+    for f in glob.glob('Dependencies/*all_instrument*.csv'):
+        try: os.remove(f)
+        except: pass
+
+cleanup_old_csvs()
+
 import threading
 import time
 from datetime import datetime, timezone, timedelta
