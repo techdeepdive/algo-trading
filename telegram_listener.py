@@ -106,13 +106,18 @@ def telegram_polling_loop(client_id, dhan_pin, dhan_totp, tg_bot, tg_chat):
                         logger.info(f"Executing Telegram Order: {action} on {symbol} at {ltp}")
                         try:
                             # Fire raw limit order using Tradehull Token
-                            sec_id = str(tsl._resolve_security_id(symbol, "NSE"))
+                            target_exchange = "BSE" if symbol in corrupt_symbols else "NSE"
+                            target_segment = "BSE_EQ" if target_exchange == "BSE" else "NSE_EQ"
+                            
+                            logger.info(f"Routing {symbol} order to {target_exchange} due to Dhan ID bug" if target_exchange == "BSE" else f"Routing {symbol} to normal {target_exchange}")
+                            
+                            sec_id = str(tsl._resolve_security_id(symbol, target_exchange))
                             logger.info(f"Resolved Security ID for {symbol}: {sec_id}")
                             payload = {
                                 "dhanClientId": client_id,
                                 "transactionType": action,
-                                "exchangeSegment": "NSE_EQ",
-                                "productType": "INTRADAY",
+                                "exchangeSegment": target_segment,
+                                "productType": "CNC",
                                 "orderType": "LIMIT",
                                 "validity": "DAY",
                                 "securityId": sec_id,
