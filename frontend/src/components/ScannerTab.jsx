@@ -151,6 +151,7 @@ export default function ScannerTab({ credentials }) {
   const closedTrades = trades.filter(t => t.status !== 'OPEN');
   
   const livePnl = openTrades.reduce((acc, t) => acc + (t.pnl || 0), 0);
+  const totalCapitalUsed = openTrades.reduce((acc, t) => acc + ((t.spot_entry || 0) * (t.premium_entry || 0)), 0);
   const bookedPnl = closedTrades.reduce((acc, t) => acc + (t.pnl || 0), 0);
   const totalPnl = livePnl + bookedPnl;
   
@@ -160,6 +161,14 @@ export default function ScannerTab({ credentials }) {
      const maxTime = new Date(Math.max(...times));
      lastSweep = maxTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   }
+  const formatDate = (isoStr) => {
+    if (!isoStr) return '-';
+    try {
+      const d = new Date(isoStr);
+      if (isNaN(d.getTime())) return isoStr;
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' ' + d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    } catch { return '-'; }
+  };
 
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-xl shadow-xl overflow-hidden">
@@ -243,7 +252,7 @@ export default function ScannerTab({ credentials }) {
         )}
 
         {/* Top Metric Panels */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-8">
           <div className="bg-slate-950 rounded-xl border border-slate-800 p-4 shadow-inner">
             <div className="text-xs font-semibold text-slate-500 mb-1 uppercase tracking-wider">Engine</div>
             <div className={`text-lg font-bold flex items-center gap-2 ${engineStatus === 'RUNNING' ? 'text-emerald-400' : engineStatus === 'PAUSED' ? 'text-amber-400' : 'text-slate-400'}`}>
@@ -264,6 +273,12 @@ export default function ScannerTab({ credentials }) {
             <div className="text-lg font-bold text-slate-400">{closedTrades.length}</div>
           </div>
           <div className="bg-slate-950 rounded-xl border border-slate-800 p-4 shadow-inner">
+            <div className="text-xs font-semibold text-slate-500 mb-1 uppercase tracking-wider">Capital Used</div>
+            <div className="text-lg font-bold text-indigo-400">
+              ₹{totalCapitalUsed.toFixed(2)}
+            </div>
+          </div>
+          <div className="bg-slate-950 rounded-xl border border-slate-800 p-4 shadow-inner">
             <div className="text-xs font-semibold text-slate-500 mb-1 uppercase tracking-wider">Live PNL</div>
             <div className={`text-lg font-bold ${livePnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
               ₹{livePnl.toFixed(2)}
@@ -278,7 +293,7 @@ export default function ScannerTab({ credentials }) {
         </div>
 
         {/* Paper Trades Table */}
-        <h3 className="text-sm font-bold text-white mb-3">Live Paper Trades</h3>
+        <h3 className="text-sm font-bold text-white mb-3 mt-8">Live Paper Trades</h3>
         <div className="bg-slate-950 rounded-xl border border-slate-800 overflow-x-auto mb-8">
           <table className="w-full text-left text-xs whitespace-nowrap">
             <thead className="bg-slate-900 border-b border-slate-800 text-slate-400 uppercase tracking-wider">
@@ -286,18 +301,21 @@ export default function ScannerTab({ credentials }) {
                 <th className="px-4 py-3 font-semibold">Symbol</th>
                 <th className="px-4 py-3 font-semibold">Type</th>
                 <th className="px-4 py-3 font-semibold">Instrument</th>
+                <th className="px-4 py-3 font-semibold">Entry Time</th>
                 <th className="px-4 py-3 font-semibold text-right">Entry Price</th>
+                <th className="px-4 py-3 font-semibold text-right">Current Price</th>
                 <th className="px-4 py-3 font-semibold text-right">Qty</th>
                 <th className="px-4 py-3 font-semibold text-right">Stop Loss</th>
                 <th className="px-4 py-3 font-semibold text-right">Target</th>
                 <th className="px-4 py-3 font-semibold text-center">Status</th>
                 <th className="px-4 py-3 font-semibold text-right">Live PNL</th>
+                <th className="px-4 py-3 font-semibold text-center">Exit Time</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/50">
               {trades.length === 0 ? (
                 <tr>
-                  <td colSpan="9" className="px-4 py-8 text-center text-slate-500 italic">
+                  <td colSpan="12" className="px-4 py-8 text-center text-slate-500 italic">
                     No paper trades executed yet. Start the engine to scan for signals.
                   </td>
                 </tr>
@@ -309,7 +327,11 @@ export default function ScannerTab({ credentials }) {
                       {t.trade_type}
                     </td>
                     <td className="px-4 py-3 text-slate-300">{t.option_symbol}</td>
+                    <td className="px-4 py-3 text-slate-400">{formatDate(t.entry_time)}</td>
                     <td className="px-4 py-3 text-right">₹{t.spot_entry.toFixed(2)}</td>
+                    <td className="px-4 py-3 text-right font-bold text-indigo-300">
+                      {t.status === 'OPEN' && t.current_price ? `₹${t.current_price.toFixed(2)}` : (t.exit_premium ? `₹${t.exit_premium.toFixed(2)}` : '-')}
+                    </td>
                     <td className="px-4 py-3 text-right font-medium">{t.premium_entry}</td>
                     <td className="px-4 py-3 text-right text-rose-400 font-medium">₹{t.stop_loss.toFixed(2)}</td>
                     <td className="px-4 py-3 text-right text-emerald-400 font-medium">₹{t.target.toFixed(2)}</td>
@@ -324,6 +346,7 @@ export default function ScannerTab({ credentials }) {
                     <td className={`px-4 py-3 text-right font-bold ${t.pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                       {t.pnl >= 0 ? '+' : ''}₹{t.pnl.toFixed(2)}
                     </td>
+                    <td className="px-4 py-3 text-center text-slate-400">{formatDate(t.exit_time)}</td>
                   </tr>
                 ))
               )}
@@ -372,6 +395,7 @@ export default function ScannerTab({ credentials }) {
                   </>
                 )}
                 <th className="px-4 py-3 font-semibold text-center">Signal</th>
+                <th className="px-4 py-3 font-semibold text-center">Last Updated</th>
                 <th className="px-4 py-3 font-semibold text-center">Action</th>
               </tr>
             </thead>
@@ -449,6 +473,9 @@ export default function ScannerTab({ credentials }) {
                         }`}>
                           {s.signal}
                         </span>
+                      </td>
+                      <td className="px-4 py-2 text-center text-slate-400">
+                        {formatDate(s.last_updated)}
                       </td>
                       <td className="px-4 py-2 text-center">
                         <button 

@@ -396,7 +396,12 @@ def get_dashboard_state():
         cursor.execute("SELECT * FROM scan_state")
         scan_state = [dict(row) for row in cursor.fetchall()]
         
-        cursor.execute("SELECT * FROM paper_trades ORDER BY id DESC LIMIT 100")
+        cursor.execute('''
+            SELECT t.*, s.ltp as current_price 
+            FROM paper_trades t
+            LEFT JOIN scan_state s ON t.symbol = s.symbol
+            ORDER BY t.id DESC LIMIT 100
+        ''')
         trades = [dict(row) for row in cursor.fetchall()]
         
         conn.close()
