@@ -369,14 +369,23 @@ def start_scanner(client_id, access_token, dhan_pin=None, dhan_totp=None, tg_bot
     if _scanner_running:
         return {"status": "success", "message": "Scanner already running"}
         
+    if dhan_pin and dhan_totp:
+        try:
+            tsl_temp = Tradehull(client_id, mode="pin_totp", pin=dhan_pin, totp_secret=dhan_totp)
+            access_token = tsl_temp.token_id
+            dhan_pin = None
+            dhan_totp = None
+        except Exception as e:
+            return {"status": "error", "message": f"Login failed: {str(e)}"}
+
     init_db()
     _scanner_running = True
     _scanner_status = "RUNNING"
-    _scanner_thread = threading.Thread(target=scanner_loop, args=(client_id, access_token, dhan_pin, dhan_totp, tg_bot, tg_chat, strategy_name, watchlists, custom_symbols))
+    _scanner_thread = threading.Thread(target=scanner_loop, args=(client_id, access_token, None, None, tg_bot, tg_chat, strategy_name, watchlists, custom_symbols))
     _scanner_thread.daemon = True
     _scanner_thread.start()
     
-    start_telegram_listener(client_id, dhan_pin, dhan_totp, tg_bot, tg_chat)
+    start_telegram_listener(client_id, access_token, None, None, tg_bot, tg_chat)
     
     return {"status": "success", "message": "Scanner started"}
 

@@ -31,14 +31,14 @@ def send_alert_with_buttons(bot_token, chat_id, text, symbol, ltp):
     except Exception as e:
         logger.error(f"Failed to send telegram button alert: {e}")
 
-def telegram_polling_loop(client_id, dhan_pin, dhan_totp, tg_bot, tg_chat):
+def telegram_polling_loop(client_id, access_token, dhan_pin, dhan_totp, tg_bot, tg_chat):
     global _tg_running
     offset = 0
     
     # Init Tradehull instance for telegram orders
     tsl = None
     try:
-        tsl = Tradehull(client_id, mode="pin_totp", pin=dhan_pin, totp_secret=dhan_totp)
+        tsl = Tradehull(client_id, access_token, mode="access_token")
         import os, pandas as pd
         if os.path.exists('api-scrip-master.csv'):
             tsl.instrument_df = pd.read_csv('api-scrip-master.csv', low_memory=False)
@@ -171,13 +171,13 @@ def telegram_polling_loop(client_id, dhan_pin, dhan_totp, tg_bot, tg_chat):
         except Exception as e:
             time.sleep(2)
 
-def start_telegram_listener(client_id, dhan_pin, dhan_totp, tg_bot, tg_chat):
+def start_telegram_listener(client_id, access_token, dhan_pin, dhan_totp, tg_bot, tg_chat):
     global _tg_thread, _tg_running
     if _tg_running or not tg_bot or not tg_chat:
         return
         
     _tg_running = True
-    _tg_thread = threading.Thread(target=telegram_polling_loop, args=(client_id, dhan_pin, dhan_totp, tg_bot, tg_chat))
+    _tg_thread = threading.Thread(target=telegram_polling_loop, args=(client_id, access_token, dhan_pin, dhan_totp, tg_bot, tg_chat))
     _tg_thread.daemon = True
     _tg_thread.start()
     
