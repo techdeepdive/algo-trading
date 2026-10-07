@@ -47,6 +47,7 @@ MCX_SYMBOLS = ["CRUDEOIL", "GOLD", "SILVER", "NATURALGAS", "COPPER", "ZINC", "AL
 
 _scanner_thread = None
 _scanner_running = False
+_scanner_status = "STOPPED"
 
 def init_db():
     conn = sqlite3.connect(DB_FILE)
@@ -256,7 +257,16 @@ def scanner_loop(client_id, access_token, dhan_pin=None, dhan_totp=None, tg_bot=
         _scanner_running = False
         return
 
+    global _scanner_status
     while _scanner_running:
+        now = datetime.now(IST)
+        if now.hour < 8 or (now.hour == 8 and now.minute < 30):
+            _scanner_status = "PAUSED"
+            logger.info("Market is closed. Pausing scan sweep until 8:30 AM IST.")
+            time.sleep(60)
+            continue
+            
+        _scanner_status = "RUNNING"
         logger.info("Starting scan sweep...")
         conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
@@ -355,12 +365,13 @@ def scanner_loop(client_id, access_token, dhan_pin=None, dhan_totp=None, tg_bot=
             time.sleep(1)
 
 def start_scanner(client_id, access_token, dhan_pin=None, dhan_totp=None, tg_bot=None, tg_chat=None, strategy_name='WPR_CROSS_EMA', watchlists=None, custom_symbols=None):
-    global _scanner_thread, _scanner_running
+    global _scanner_thread, _scanner_running, _scanner_status
     if _scanner_running:
         return {"status": "success", "message": "Scanner already running"}
         
     init_db()
     _scanner_running = True
+    _scanner_status = "RUNNING"
     _scanner_thread = threading.Thread(target=scanner_loop, args=(client_id, access_token, dhan_pin, dhan_totp, tg_bot, tg_chat, strategy_name, watchlists, custom_symbols))
     _scanner_thread.daemon = True
     _scanner_thread.start()
@@ -370,8 +381,9 @@ def start_scanner(client_id, access_token, dhan_pin=None, dhan_totp=None, tg_bot
     return {"status": "success", "message": "Scanner started"}
 
 def stop_scanner():
-    global _scanner_running
+    global _scanner_running, _scanner_status
     _scanner_running = False
+    _scanner_status = "STOPPED"
     stop_telegram_listener()
     return {"status": "success", "message": "Scanner stopping"}
 
@@ -391,6 +403,7 @@ def get_dashboard_state():
         return {
             "status": "success",
             "is_running": _scanner_running,
+            "engine_status": _scanner_status if _scanner_running else "STOPPED",
             "scan_state": scan_state,
             "trades": trades
         }

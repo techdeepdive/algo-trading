@@ -4,6 +4,7 @@ import { Play, Square, Loader2, RefreshCw } from 'lucide-react';
 export default function ScannerTab({ credentials }) {
   const [loading, setLoading] = useState(false);
   const [engineRunning, setEngineRunning] = useState(false);
+  const [engineStatus, setEngineStatus] = useState('STOPPED');
   const [scanState, setScanState] = useState([]);
   const [trades, setTrades] = useState([]);
   const [error, setError] = useState(null);
@@ -21,6 +22,7 @@ export default function ScannerTab({ credentials }) {
         const data = await res.json();
         if (data.status === 'success') {
           setEngineRunning(data.is_running);
+          setEngineStatus(data.engine_status || (data.is_running ? 'RUNNING' : 'STOPPED'));
           setScanState(data.scan_state || []);
           setTrades(data.trades || []);
           setError(null);
@@ -244,9 +246,9 @@ export default function ScannerTab({ credentials }) {
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
           <div className="bg-slate-950 rounded-xl border border-slate-800 p-4 shadow-inner">
             <div className="text-xs font-semibold text-slate-500 mb-1 uppercase tracking-wider">Engine</div>
-            <div className={`text-lg font-bold flex items-center gap-2 ${engineRunning ? 'text-emerald-400' : 'text-slate-400'}`}>
-              {engineRunning && <RefreshCw className="w-4 h-4 animate-spin" />}
-              {engineRunning ? 'RUNNING' : 'STOPPED'}
+            <div className={`text-lg font-bold flex items-center gap-2 ${engineStatus === 'RUNNING' ? 'text-emerald-400' : engineStatus === 'PAUSED' ? 'text-amber-400' : 'text-slate-400'}`}>
+              {engineStatus === 'RUNNING' && <RefreshCw className="w-4 h-4 animate-spin" />}
+              {engineStatus === 'PAUSED' ? 'PAUSED (Market Closed)' : engineStatus}
             </div>
           </div>
           <div className="bg-slate-950 rounded-xl border border-slate-800 p-4 shadow-inner">
