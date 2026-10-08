@@ -134,6 +134,10 @@ export default function ScannerTab({ credentials }) {
   };
 
   const clearDatabase = async (force = false) => {
+    if (!credentials.client_id || !credentials.dhan_pin || !credentials.dhan_totp) {
+      setError("Please save Dhan credentials in the Setup tab to clear data.");
+      return;
+    }
     if (!force && !window.confirm("Are you sure you want to clear all scanner data and paper trades?")) return;
     try {
       await fetch('/api/algoscan/clear', { method: 'POST' });
