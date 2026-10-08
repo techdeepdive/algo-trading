@@ -255,9 +255,9 @@ export default function ScannerTab({ credentials }) {
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-8">
           <div className="bg-slate-950 rounded-xl border border-slate-800 p-4 shadow-inner">
             <div className="text-xs font-semibold text-slate-500 mb-1 uppercase tracking-wider">Engine</div>
-            <div className={`text-lg font-bold flex items-center gap-2 ${engineStatus === 'RUNNING' ? 'text-emerald-400' : engineStatus === 'PAUSED' ? 'text-amber-400' : 'text-slate-400'}`}>
+            <div className={`text-lg font-bold flex items-center gap-2 ${engineStatus === 'RUNNING' ? 'text-emerald-400' : engineStatus === 'PAUSED' ? 'text-amber-400' : engineStatus.startsWith('ERROR') ? 'text-rose-500' : 'text-slate-400'}`}>
               {engineStatus === 'RUNNING' && <RefreshCw className="w-4 h-4 animate-spin" />}
-              {engineStatus === 'PAUSED' ? 'PAUSED (Market Closed)' : engineStatus}
+              {engineStatus === 'PAUSED' ? 'PAUSED (Market Closed)' : engineStatus.startsWith('ERROR') ? 'AUTH ERROR' : engineStatus}
             </div>
           </div>
           <div className="bg-slate-950 rounded-xl border border-slate-800 p-4 shadow-inner">

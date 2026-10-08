@@ -352,7 +352,30 @@ def scanner_loop(client_id, access_token, dhan_pin=None, dhan_totp=None, tg_bot=
                             except: pass
 
             except Exception as e:
-                logger.error(f"Error processing {symbol}: {e}")
+                err_str = str(e)
+                logger.error(f"Error processing {symbol}: {err_str}")
+                if 'DH-901' in err_str or 'expired' in err_str.lower():
+                    if dhan_pin and dhan_totp:
+                        logger.info("Access token expired. Regenerating...")
+                        try:
+                            new_tsl = Tradehull(client_id, mode="pin_totp", pin=dhan_pin, totp_secret=dhan_totp)
+                            tsl = Tradehull(client_id, new_tsl.token_id, mode="access_token")
+                            
+                            stop_telegram_listener()
+                            time.sleep(2)
+                            start_telegram_listener(client_id, new_tsl.token_id, None, None, tg_bot, tg_chat)
+                            
+                            logger.info("Successfully refreshed access token and restarted components.")
+                            break # Break inner loop, restart sweep
+                        except Exception as token_err:
+                            logger.error(f"Failed to auto-refresh token: {token_err}")
+                            _scanner_status = "ERROR: Token Expired"
+                            _scanner_running = False
+                            break
+                    else:
+                        _scanner_status = "ERROR: Token Expired"
+                        _scanner_running = False
+                        break
                 
             time.sleep(1)
 
@@ -373,15 +396,13 @@ def start_scanner(client_id, access_token, dhan_pin=None, dhan_totp=None, tg_bot
         try:
             tsl_temp = Tradehull(client_id, mode="pin_totp", pin=dhan_pin, totp_secret=dhan_totp)
             access_token = tsl_temp.token_id
-            dhan_pin = None
-            dhan_totp = None
         except Exception as e:
             return {"status": "error", "message": f"Login failed: {str(e)}"}
 
     init_db()
     _scanner_running = True
     _scanner_status = "RUNNING"
-    _scanner_thread = threading.Thread(target=scanner_loop, args=(client_id, access_token, None, None, tg_bot, tg_chat, strategy_name, watchlists, custom_symbols))
+    _scanner_thread = threading.Thread(target=scanner_loop, args=(client_id, access_token, dhan_pin, dhan_totp, tg_bot, tg_chat, strategy_name, watchlists, custom_symbols))
     _scanner_thread.daemon = True
     _scanner_thread.start()
     
