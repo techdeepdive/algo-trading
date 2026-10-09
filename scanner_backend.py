@@ -257,6 +257,17 @@ def scanner_loop(client_id, access_token, dhan_pin=None, dhan_totp=None, tg_bot=
         _scanner_running = False
         return
 
+    class TokenErrorInterceptor(logging.Handler):
+        def __init__(self):
+            super().__init__()
+            self.token_expired = False
+        def emit(self, record):
+            if 'DH-901' in str(record.getMessage()) or 'expired' in str(record.getMessage()).lower():
+                self.token_expired = True
+
+    interceptor = TokenErrorInterceptor()
+    logging.getLogger().addHandler(interceptor)
+
     global _scanner_status
     while _scanner_running:
         now = datetime.now(IST)
@@ -279,6 +290,8 @@ def scanner_loop(client_id, access_token, dhan_pin=None, dhan_totp=None, tg_bot=
                 exchange = "MCX" if symbol in MCX_SYMBOLS else "NSE"
                 df = tsl.get_historical_data(tradingsymbol=symbol, exchange=exchange, timeframe="15")
                 if df is None or df.empty:
+                    if interceptor.token_expired:
+                        raise Exception("DH-901: Token expired detected via logging interceptor")
                     continue
                     
                 ltp = float(df.iloc[-1]['close'])
@@ -355,6 +368,7 @@ def scanner_loop(client_id, access_token, dhan_pin=None, dhan_totp=None, tg_bot=
                 err_str = str(e)
                 logger.error(f"Error processing {symbol}: {err_str}")
                 if 'DH-901' in err_str or 'expired' in err_str.lower():
+                    interceptor.token_expired = False
                     if dhan_pin and dhan_totp:
                         logger.info("Access token expired. Regenerating...")
                         try:
