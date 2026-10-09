@@ -55,6 +55,7 @@ export default function ScannerTab({ credentials }) {
           dhan_pin: credentials.dhan_pin, dhan_totp: credentials.dhan_totp,
           tg_bot: credentials.tg_bot,
           tg_chat: credentials.tg_chat,
+          gemini_key: credentials.gemini_key,
           strategy_name: selectedStrategy,
           watchlists: watchlists,
           custom_symbols: customSymbols

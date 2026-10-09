@@ -650,12 +650,13 @@ def api_algoscan_start():
     access_token = data.get("access_token")
     tg_bot = data.get("tg_bot")
     tg_chat = data.get("tg_chat")
+    gemini_key = data.get("gemini_key")
     strategy_name = data.get("strategy_name", "WPR_CROSS_EMA")
     watchlists = data.get("watchlists", ["nifty50"])
     custom_symbols = data.get("custom_symbols", "")
     if not client_id or (not access_token and (not dhan_pin or not dhan_totp)):
         return jsonify({"status": "error", "message": "Dhan credentials required"}), 400
-    res = start_scanner(client_id, access_token, dhan_pin, dhan_totp, tg_bot, tg_chat, strategy_name, watchlists, custom_symbols)
+    res = start_scanner(client_id, access_token, dhan_pin, dhan_totp, tg_bot, tg_chat, gemini_key, strategy_name, watchlists, custom_symbols)
     return jsonify(res)
 
 @app.route("/api/algoscan/stop", methods=["POST"])

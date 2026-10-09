@@ -25,6 +25,24 @@ IST = timezone(timedelta(hours=5, minutes=30))
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("scanner_backend")
 
+def get_gemini_summary(symbol, signal, ltp, sl, tgt, gemini_key):
+    if not gemini_key:
+        return ""
+    try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}"
+        prompt = f"Give a very short 1-2 sentence analysis on this trade setup and any recent market news on {symbol}. Trade: {signal} {symbol} at {ltp}, SL: {sl:.2f}, Target: {tgt:.2f}."
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"temperature": 0.5, "maxOutputTokens": 100}
+        }
+        resp = requests.post(url, json=payload, timeout=5)
+        if resp.status_code == 200:
+            data = resp.json()
+            return "\n\n🤖 AI: " + data["candidates"][0]["content"]["parts"][0]["text"].strip()
+    except Exception as e:
+        logger.error(f"Gemini API error: {e}")
+    return ""
+
 DB_FILE = "algo_lab.db"
 SCAN_INTERVAL_SECONDS = 300  # 5 minutes
 
@@ -214,7 +232,7 @@ def run_screener(client_id, access_token, dhan_pin=None, dhan_totp=None, strateg
     return {"status": "success", "data": results}
 
 
-def scanner_loop(client_id, access_token, dhan_pin=None, dhan_totp=None, tg_bot=None, tg_chat=None, strategy_name='WPR_CROSS_EMA', watchlists=None, custom_symbols=None):
+def scanner_loop(client_id, access_token, dhan_pin=None, dhan_totp=None, tg_bot=None, tg_chat=None, gemini_key=None, strategy_name='WPR_CROSS_EMA', watchlists=None, custom_symbols=None):
     global _scanner_running
     
     if watchlists is None:
@@ -365,8 +383,11 @@ def scanner_loop(client_id, access_token, dhan_pin=None, dhan_totp=None, tg_bot=
                         if tg_bot and tg_chat:
                             try:
                                 msg = f"PAPER ENTRY: {signal} {qty} {symbol} at {ltp}. SL: {sl:.2f}, TGT: {tgt:.2f}"
+                                ai_summary = get_gemini_summary(symbol, signal, ltp, sl, tgt, gemini_key)
+                                msg += ai_summary
                                 send_alert_with_buttons(bot_token=tg_bot, chat_id=tg_chat, text=msg, symbol=symbol, ltp=ltp)
-                            except: pass
+                            except Exception as e:
+                                logger.error(f"Error sending TG alert: {e}")
 
             except Exception as e:
                 err_str = str(e)
@@ -405,7 +426,7 @@ def scanner_loop(client_id, access_token, dhan_pin=None, dhan_totp=None, tg_bot=
                 break
             time.sleep(1)
 
-def start_scanner(client_id, access_token, dhan_pin=None, dhan_totp=None, tg_bot=None, tg_chat=None, strategy_name='WPR_CROSS_EMA', watchlists=None, custom_symbols=None):
+def start_scanner(client_id, access_token, dhan_pin=None, dhan_totp=None, tg_bot=None, tg_chat=None, gemini_key=None, strategy_name='WPR_CROSS_EMA', watchlists=None, custom_symbols=None):
     global _scanner_thread, _scanner_running, _scanner_status
     if _scanner_running:
         return {"status": "success", "message": "Scanner already running"}
@@ -420,7 +441,7 @@ def start_scanner(client_id, access_token, dhan_pin=None, dhan_totp=None, tg_bot
     init_db()
     _scanner_running = True
     _scanner_status = "RUNNING"
-    _scanner_thread = threading.Thread(target=scanner_loop, args=(client_id, access_token, dhan_pin, dhan_totp, tg_bot, tg_chat, strategy_name, watchlists, custom_symbols))
+    _scanner_thread = threading.Thread(target=scanner_loop, args=(client_id, access_token, dhan_pin, dhan_totp, tg_bot, tg_chat, gemini_key, strategy_name, watchlists, custom_symbols))
     _scanner_thread.daemon = True
     _scanner_thread.start()
     
