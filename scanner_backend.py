@@ -27,20 +27,30 @@ logger = logging.getLogger("scanner_backend")
 
 from google import genai
 
+logging.getLogger("google_genai.models").setLevel(logging.ERROR)
+import time
+
 def get_gemini_summary(symbol, signal, ltp, sl, tgt, gemini_key):
     if not gemini_key:
         return ""
-    try:
-        client = genai.Client(api_key=gemini_key)
-        prompt = f"Give a very short 1-2 sentence analysis on this trade setup and any recent market news on {symbol}. Trade: {signal} {symbol} at {ltp}, SL: {sl:.2f}, Target: {tgt:.2f}."
-        
-        response = client.models.generate_content(
-            model='gemini-3.8-flash',
-            contents=prompt,
-        )
-        return "\n\n🤖 AI: " + response.text.strip()
-    except Exception as e:
-        logger.error(f"Gemini API error: {e}")
+    
+    prompt = f"Give a very short 1-2 sentence analysis on this trade setup and any recent market news on {symbol}. Trade: {signal} {symbol} at {ltp}, SL: {sl:.2f}, Target: {tgt:.2f}."
+    client = genai.Client(api_key=gemini_key)
+    
+    for attempt in range(3):
+        try:
+            response = client.models.generate_content(
+                model='gemini-3.8-flash',
+                contents=prompt,
+            )
+            return "\n\n🤖 AI: " + response.text.strip()
+        except Exception as e:
+            if '503' in str(e) or '429' in str(e):
+                logger.warning(f"Gemini API rate limit/overload (attempt {attempt+1}/3)... sleeping 3s")
+                time.sleep(3)
+            else:
+                logger.error(f"Gemini API error: {e}")
+                break
     return ""
 
 DB_FILE = "algo_lab.db"
