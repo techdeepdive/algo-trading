@@ -30,11 +30,12 @@ from google import genai
 logging.getLogger("google_genai.models").setLevel(logging.ERROR)
 import time
 
-def get_gemini_summary(symbol, signal, ltp, sl, tgt, gemini_key):
-    if not gemini_key:
+def get_gemini_batch_summary(trades, gemini_key):
+    if not gemini_key or not trades:
         return ""
     
-    prompt = f"Give a very short 1-2 sentence analysis on this trade setup and any recent market news on {symbol}. Trade: {signal} {symbol} at {ltp}, SL: {sl:.2f}, Target: {tgt:.2f}."
+    trades_text = "\n".join([f"- {t['signal']} {t['symbol']} at {t['ltp']}, SL: {t['sl']:.2f}, Target: {t['tgt']:.2f}" for t in trades])
+    prompt = f"Give a very short 2-3 sentence overall market analysis and news summary for these trade setups:\n{trades_text}"
     client = genai.Client(api_key=gemini_key)
     
     for attempt in range(3):
@@ -43,7 +44,7 @@ def get_gemini_summary(symbol, signal, ltp, sl, tgt, gemini_key):
                 model='gemini-3.8-flash',
                 contents=prompt,
             )
-            return "\n\n🤖 AI: " + response.text.strip()
+            return "\n\n🤖 AI Batch Summary: " + response.text.strip()
         except Exception as e:
             if '503' in str(e) or '429' in str(e):
                 logger.warning(f"Gemini API rate limit/overload (attempt {attempt+1}/3)... sleeping 3s")
@@ -311,6 +312,7 @@ def scanner_loop(client_id, access_token, dhan_pin=None, dhan_totp=None, tg_bot=
             
         _scanner_status = "RUNNING"
         logger.info("Starting scan sweep...")
+        sweep_trades = []
         conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
         
@@ -393,11 +395,13 @@ def scanner_loop(client_id, access_token, dhan_pin=None, dhan_totp=None, tg_bot=
                         if tg_bot and tg_chat:
                             try:
                                 msg = f"PAPER ENTRY: {signal} {qty} {symbol} at {ltp}. SL: {sl:.2f}, TGT: {tgt:.2f}"
-                                ai_summary = get_gemini_summary(symbol, signal, ltp, sl, tgt, gemini_key)
-                                msg += ai_summary
                                 send_alert_with_buttons(bot_token=tg_bot, chat_id=tg_chat, text=msg, symbol=symbol, ltp=ltp)
                             except Exception as e:
                                 logger.error(f"Error sending TG alert: {e}")
+                                
+                        sweep_trades.append({
+                            "symbol": symbol, "signal": signal, "ltp": ltp, "sl": sl, "tgt": tgt
+                        })
 
             except Exception as e:
                 err_str = str(e)
@@ -427,6 +431,15 @@ def scanner_loop(client_id, access_token, dhan_pin=None, dhan_totp=None, tg_bot=
                         break
                 
             time.sleep(1)
+
+        if sweep_trades and tg_bot and tg_chat and gemini_key:
+            try:
+                batch_summary = get_gemini_batch_summary(sweep_trades, gemini_key)
+                if batch_summary:
+                    url = f"https://api.telegram.org/bot{tg_bot}/sendMessage"
+                    requests.post(url, json={"chat_id": tg_chat, "text": batch_summary}, timeout=10)
+            except Exception as e:
+                logger.error(f"Failed to send batch TG summary: {e}")
 
         conn.close()
         logger.info("Sweep complete. Sleeping...")
