@@ -25,20 +25,20 @@ IST = timezone(timedelta(hours=5, minutes=30))
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("scanner_backend")
 
+from google import genai
+
 def get_gemini_summary(symbol, signal, ltp, sl, tgt, gemini_key):
     if not gemini_key:
         return ""
     try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}"
+        client = genai.Client(api_key=gemini_key)
         prompt = f"Give a very short 1-2 sentence analysis on this trade setup and any recent market news on {symbol}. Trade: {signal} {symbol} at {ltp}, SL: {sl:.2f}, Target: {tgt:.2f}."
-        payload = {
-            "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {"temperature": 0.5, "maxOutputTokens": 100}
-        }
-        resp = requests.post(url, json=payload, timeout=5)
-        if resp.status_code == 200:
-            data = resp.json()
-            return "\n\n🤖 AI: " + data["candidates"][0]["content"]["parts"][0]["text"].strip()
+        
+        response = client.models.generate_content(
+            model='gemini-3.8-flash',
+            contents=prompt,
+        )
+        return "\n\n🤖 AI: " + response.text.strip()
     except Exception as e:
         logger.error(f"Gemini API error: {e}")
     return ""
