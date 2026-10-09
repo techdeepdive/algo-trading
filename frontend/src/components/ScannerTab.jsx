@@ -11,7 +11,7 @@ export default function ScannerTab({ credentials }) {
   const [showModal, setShowModal] = useState(false);
   const [tradeForm, setTradeForm] = useState(null);
   const [selectedStrategy, setSelectedStrategy] = useState('WPR_CROSS_EMA');
-  const [watchlists, setWatchlists] = useState(['nifty50']);
+  const [watchlists, setWatchlists] = useState(['nifty50', 'banknifty', 'mcx']);
   const [customSymbols, setCustomSymbols] = useState('');
 
   // Poll state every 5 seconds
