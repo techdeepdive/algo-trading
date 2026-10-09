@@ -422,7 +422,7 @@ export default function ScannerTab({ credentials }) {
                       <td className="px-4 py-2 text-right">₹{s.ltp.toFixed(2)}</td>
                       {selectedStrategy === 'WPR_CROSS_EMA' && (
                         <>
-                          <td className={`px-4 py-2 text-right font-medium ${s.wpr < -80 ? 'text-emerald-400' : s.wpr > -20 ? 'text-rose-400' : 'text-slate-300'}`}>
+                          <td className={`px-4 py-2 text-right font-medium ${s.wpr < -70 ? 'text-emerald-400' : s.wpr > -20 ? 'text-rose-400' : 'text-slate-300'}`}>
                             {s.wpr.toFixed(2)}
                           </td>
                           <td className="px-4 py-2 text-right text-slate-300">{s.ema_fast.toFixed(2)}</td>
