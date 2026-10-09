@@ -271,9 +271,13 @@ def scanner_loop(client_id, access_token, dhan_pin=None, dhan_totp=None, tg_bot=
     global _scanner_status
     while _scanner_running:
         now = datetime.now(IST)
-        if now.hour < 8 or (now.hour == 8 and now.minute < 30):
+        
+        is_weekend = now.weekday() >= 5
+        is_night = now.hour < 8 or (now.hour == 8 and now.minute < 30)
+        
+        if is_weekend or is_night:
             _scanner_status = "PAUSED"
-            logger.info("Market is closed. Pausing scan sweep until 8:30 AM IST.")
+            logger.info("Market is closed (weekend or night). Pausing scan sweep.")
             time.sleep(60)
             continue
             
