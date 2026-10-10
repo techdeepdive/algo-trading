@@ -136,6 +136,9 @@ def crypto_scanner_loop(api_key, api_secret, tg_bot, tg_chat):
     
     while _scanner_running:
         try:
+            import time
+            start_sweep = time.time()
+            logger.info(f"Starting crypto market sweep for {len(CRYPTO_SYMBOLS)} coins...")
             ist = pytz.timezone('Asia/Kolkata')
             scan_time = datetime.datetime.now(ist).strftime("%Y-%m-%d %H:%M:%S")
             alert_batch = []
@@ -218,6 +221,7 @@ def crypto_scanner_loop(api_key, api_secret, tg_bot, tg_chat):
             _crypto_state = current_scan_state
             
             # Send AI Summary
+            logger.info(f"Sweep completed in {round(time.time() - start_sweep, 2)} seconds. Found {len(alert_batch)} signals.")
             if len(alert_batch) > 0:
                 import os, google.generativeai as genai
                 gemini_key = os.getenv("GEMINI_API_KEY")

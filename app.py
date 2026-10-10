@@ -877,6 +877,7 @@ if __name__ == "__main__":
 @app.route('/api/crypto/execute_trade', methods=['POST'])
 def execute_crypto_trade():
     data = request.json
+    logger.info(f"Manual Crypto Trade Requested: {data.get('signal')} on {data.get('symbol')}")
     api_key = request.headers.get('Delta-Api-Key')
     api_secret = request.headers.get('Delta-Api-Secret')
     
@@ -960,6 +961,7 @@ def clear_crypto_trades():
         cur.execute("DELETE FROM crypto_trades")
         conn.commit()
         conn.close()
+        logger.info("Cleared all crypto trades from database (User Triggered)")
         return jsonify({"status": "success", "message": "All crypto trades cleared."})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
