@@ -175,7 +175,13 @@ const CryptoScannerTab = ({ credentials }) => {
           </div>
         </div>
 
-        <div className="grid grid-cols-6 gap-4 mb-6">
+        <div className="grid grid-cols-7 gap-4 mb-6">
+          <div className="bg-slate-950 border border-slate-800/50 rounded-lg p-4 flex flex-col justify-center">
+            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Delta Balance</div>
+            <div className="text-lg font-bold text-white">
+              {balance !== null ? `₹${(parseFloat(balance) * 86.0).toFixed(2)} INR` : '-'}
+            </div>
+          </div>
           <div className="bg-slate-950 border border-slate-800/50 rounded-lg p-4 flex flex-col justify-center">
             <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Engine</div>
             <div className={`text-lg font-bold ${engineState === 'running' ? 'text-emerald-400' : 'text-slate-400'}`}>
@@ -235,7 +241,7 @@ const CryptoScannerTab = ({ credentials }) => {
                 <tbody className="divide-y divide-slate-800/50">
                   {scannerState.length === 0 ? (
                     <tr>
-                      <td colSpan="10" className="px-4 py-8 text-center text-slate-500 italic">
+                      <td colSpan="11" className="px-4 py-8 text-center text-slate-500 italic">
                         {engineState === 'running' ? 'Scanning crypto markets... Data will appear shortly.' : 'Engine stopped. Start engine to view live scanner state.'}
                       </td>
                     </tr>
@@ -293,7 +299,7 @@ const CryptoScannerTab = ({ credentials }) => {
             <tbody className="divide-y divide-slate-800/50">
               {trades.length === 0 ? (
                 <tr>
-                  <td colSpan="10" className="px-4 py-8 text-center text-slate-500 italic">
+                  <td colSpan="11" className="px-4 py-8 text-center text-slate-500 italic">
                     No crypto trades executed yet. Start the engine to scan for signals.
                   </td>
                 </tr>

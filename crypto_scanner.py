@@ -136,6 +136,9 @@ def crypto_scanner_loop(api_key, api_secret, tg_bot, tg_chat):
     
     while _scanner_running:
         try:
+            ist = pytz.timezone('Asia/Kolkata')
+            scan_time = datetime.datetime.now(ist).strftime("%Y-%m-%d %H:%M:%S")
+            alert_batch = []
             conn = sqlite3.connect(DB_NAME)
             c = conn.cursor()
             
@@ -232,7 +235,7 @@ def crypto_scanner_loop(api_key, api_secret, tg_bot, tg_chat):
         except Exception as e:
             logger.error(f"Crypto Scanner Error: {e}")
             
-        time.sleep(60) # Sleep 5 minutes between 60m scans
+        time.sleep(900) # Sleep 5 minutes between 60m scans
 
 def start_crypto_scanner(api_key, api_secret, tg_bot, tg_chat):
     global _scanner_running
