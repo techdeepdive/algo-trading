@@ -306,7 +306,7 @@ const CryptoScannerTab = ({ credentials }) => {
                       <td className={`px-4 py-2 font-bold ${s.signal === 'LONG' ? 'text-emerald-400' : s.signal === 'SHORT' ? 'text-rose-400' : 'text-slate-500'}`}>
                         {s.signal}
                       </td>
-                      <td className="px-4 py-2 text-right text-slate-300 font-medium">${s.ltp ? s.ltp.toFixed(2) : '-'}</td>
+                      <td className="px-4 py-2 text-right text-slate-300 font-medium">${s.ltp ? s.ltp.toFixed(6) : '-'}</td>
                       <td className={`px-4 py-2 text-right font-medium ${s.wpr > -50 ? 'text-emerald-400' : 'text-rose-400'}`}>
                         {s.wpr ? s.wpr.toFixed(2) : '-'}
                       </td>
@@ -376,7 +376,7 @@ const CryptoScannerTab = ({ credentials }) => {
                     <td className="px-4 py-3 text-slate-400 text-right">{t.entry_time}</td>
                     <td className="px-4 py-3 text-right font-medium text-slate-300">${t.entry_price ? t.entry_price.toFixed(6) : '0.000000'}</td>
                     <td className="px-4 py-3 text-right font-bold text-indigo-300">
-                      ${t.current_price ? t.current_price.toFixed(2) : '-'}
+                      ${t.current_price ? t.current_price.toFixed(6) : '-'}
                     </td>
                     <td className="px-4 py-3 text-right text-emerald-400 font-medium">${t.target ? t.target.toFixed(6) : '0.000000'}</td>
                     <td className="px-4 py-3 text-right text-rose-400 font-medium">${t.stop_loss ? t.stop_loss.toFixed(6) : '0.000000'}</td>
