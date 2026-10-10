@@ -305,13 +305,14 @@ export default function ScannerTab({ credentials }) {
               <tr>
                 <th className="px-4 py-3 font-semibold">Symbol</th>
                 <th className="px-4 py-3 font-semibold">Type</th>
-                <th className="px-4 py-3 font-semibold">Instrument</th>
-                <th className="px-4 py-3 font-semibold">Entry Time</th>
-                <th className="px-4 py-3 font-semibold text-right">Entry Price</th>
-                <th className="px-4 py-3 font-semibold text-right">Current Price</th>
-                <th className="px-4 py-3 font-semibold text-right">Qty</th>
-                <th className="px-4 py-3 font-semibold text-right">Stop Loss</th>
-                <th className="px-4 py-3 font-semibold text-right">Target</th>
+                <th className="px-4 py-3 font-semibold">Spread Legs</th>
+                <th className="px-4 py-3 font-semibold text-right">Entry Time</th>
+                <th className="px-4 py-3 font-semibold text-right">Spot Entry</th>
+                <th className="px-4 py-3 font-semibold text-right">Spot Current</th>
+                <th className="px-4 py-3 font-semibold text-right">Lot Qty</th>
+                <th className="px-4 py-3 font-semibold text-right">Net Premium</th>
+                <th className="px-4 py-3 font-semibold text-right">Spot Target</th>
+                <th className="px-4 py-3 font-semibold text-right">Spot SL</th>
                 <th className="px-4 py-3 font-semibold text-center">Status</th>
                 <th className="px-4 py-3 font-semibold text-right">Live PNL</th>
                 <th className="px-4 py-3 font-semibold text-center">Exit Time</th>
@@ -320,7 +321,7 @@ export default function ScannerTab({ credentials }) {
             <tbody className="divide-y divide-slate-800/50">
               {trades.length === 0 ? (
                 <tr>
-                  <td colSpan="12" className="px-4 py-8 text-center text-slate-500 italic">
+                  <td colSpan="13" className="px-4 py-8 text-center text-slate-500 italic">
                     No paper trades executed yet. Start the engine to scan for signals.
                   </td>
                 </tr>
@@ -328,18 +329,26 @@ export default function ScannerTab({ credentials }) {
                 trades.map((t) => (
                   <tr key={t.id} className="hover:bg-slate-900/50 transition-colors">
                     <td className="px-4 py-3 font-bold text-white">{t.symbol}</td>
-                    <td className={`px-4 py-3 font-bold ${t.trade_type === 'LONG' ? 'text-indigo-400' : 'text-rose-400'}`}>
-                      {t.trade_type}
+                    <td className={`px-4 py-3 font-bold ${t.trade_type === 'LONG' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                      {t.spread_type}
                     </td>
-                    <td className="px-4 py-3 text-slate-300">{t.option_symbol}</td>
-                    <td className="px-4 py-3 text-slate-400">{formatDate(t.entry_time)}</td>
-                    <td className="px-4 py-3 text-right">₹{t.spot_entry.toFixed(2)}</td>
+                    <td className="px-4 py-3">
+                      <div className="text-xs text-rose-400 font-semibold mb-0.5">S: {t.leg1_symbol}</div>
+                      <div className="text-xs text-emerald-400 font-semibold">B: {t.leg2_symbol}</div>
+                    </td>
+                    <td className="px-4 py-3 text-slate-400 text-right">{formatDate(t.entry_time)}</td>
+                    <td className="px-4 py-3 text-right font-medium text-slate-300">₹{t.spot_entry ? t.spot_entry.toFixed(2) : '0.00'}</td>
                     <td className="px-4 py-3 text-right font-bold text-indigo-300">
-                      {t.status === 'OPEN' && t.current_price ? `₹${t.current_price.toFixed(2)}` : (t.exit_premium ? `₹${t.exit_premium.toFixed(2)}` : '-')}
+                      {t.status === 'OPEN' && t.current_price ? `₹${t.current_price.toFixed(2)}` : (t.exit_spot ? `₹${t.exit_spot.toFixed(2)}` : '-')}
                     </td>
-                    <td className="px-4 py-3 text-right font-medium">{t.premium_entry}</td>
-                    <td className="px-4 py-3 text-right text-rose-400 font-medium">₹{t.stop_loss.toFixed(2)}</td>
-                    <td className="px-4 py-3 text-right text-emerald-400 font-medium">₹{t.target.toFixed(2)}</td>
+                    <td className="px-4 py-3 text-right font-medium text-slate-400">{t.lot_size}</td>
+                    <td className="px-4 py-3 text-right font-medium text-amber-400">
+                      Entry: {t.net_premium_entry ? t.net_premium_entry.toFixed(2) : '0.00'}
+                      <br/>
+                      <span className="text-[10px] text-slate-500 text-right w-full block">Live: {t.status === 'OPEN' ? (t.net_premium_exit ? t.net_premium_exit.toFixed(2) : '-') : (t.net_premium_exit ? t.net_premium_exit.toFixed(2) : '-')}</span>
+                    </td>
+                    <td className="px-4 py-3 text-right text-emerald-400 font-medium">₹{t.target ? t.target.toFixed(2) : '0.00'}</td>
+                    <td className="px-4 py-3 text-right text-rose-400 font-medium">₹{t.stop_loss ? t.stop_loss.toFixed(2) : '0.00'}</td>
                     <td className="px-4 py-3 text-center">
                       <span className={`px-2 py-1 rounded-full text-[10px] font-bold ${
                         t.status === 'OPEN' ? 'bg-amber-500/20 text-amber-400' : 

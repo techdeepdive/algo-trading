@@ -46,6 +46,8 @@ def run_scan(client_id, access_token, tg_bot=None, tg_chat=None):
         
     try:
         tsl = Tradehull(client_id, access_token, mode="access_token")
+        if not hasattr(tsl, 'Dhan'):
+            raise Exception("Tradehull initialization failed silently.")
     except Exception as e:
         return {"status": "error", "message": str(e)}
 

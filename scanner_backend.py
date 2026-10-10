@@ -14,6 +14,7 @@ import threading
 import time
 from datetime import datetime, timezone, timedelta
 import pandas as pd
+import numpy as np
 import requests
 import os
 from Dhan_Tradehull import Tradehull
@@ -86,16 +87,24 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             symbol TEXT,
             trade_type TEXT,
-            option_symbol TEXT,
+            spread_type TEXT,
+            leg1_symbol TEXT,
+            leg2_symbol TEXT,
+            lot_size INTEGER,
             entry_time TEXT,
             spot_entry REAL,
-            premium_entry REAL,
+            leg1_entry_price REAL,
+            leg2_entry_price REAL,
+            net_premium_entry REAL,
             stop_loss REAL,
             target REAL,
             status TEXT,
             pnl REAL,
             exit_time TEXT,
-            exit_premium REAL
+            exit_spot REAL,
+            leg1_exit_price REAL,
+            leg2_exit_price REAL,
+            net_premium_exit REAL
         )
     ''')
     
@@ -112,6 +121,55 @@ def init_db():
     ''')
     conn.commit()
     conn.close()
+
+def get_spread_legs(symbol, ltp, signal):
+    try:
+        df = pd.read_csv('api-scrip-master.csv', low_memory=False)
+        opt_type = 'PE' if signal == 'LONG' else 'CE'
+        
+        opts = df[
+            (df['SEM_EXCH_INSTRUMENT_TYPE'] == 'OP') & 
+            (df['SEM_TRADING_SYMBOL'].str.startswith(f'{symbol}-')) & 
+            (df['SEM_OPTION_TYPE'] == opt_type) & 
+            (df['SEM_EXPIRY_FLAG'] == 'M')
+        ].copy()
+        
+        if opts.empty: return None, None, 1
+            
+        opts['SEM_EXPIRY_DATE'] = pd.to_datetime(opts['SEM_EXPIRY_DATE'])
+        today = datetime.now()
+        
+        future_opts = opts[opts['SEM_EXPIRY_DATE'] >= today]
+        expiries = sorted(future_opts['SEM_EXPIRY_DATE'].dt.date.unique())
+        
+        if not expiries: return None, None, 1
+            
+        target_expiry = expiries[0]
+        if (target_expiry - today.date()).days <= 14 and len(expiries) > 1:
+            target_expiry = expiries[1]
+            
+        target_opts = future_opts[future_opts['SEM_EXPIRY_DATE'].dt.date == target_expiry]
+        strikes = sorted(target_opts['SEM_STRIKE_PRICE'].unique())
+        if not strikes: return None, None, 1
+        
+        atm_idx = np.abs(np.array(strikes) - ltp).argmin()
+        
+        if signal == 'LONG':
+            leg1_strike = strikes[atm_idx]
+            leg2_idx = max(0, atm_idx - 2)
+            leg2_strike = strikes[leg2_idx]
+        else:
+            leg1_strike = strikes[atm_idx]
+            leg2_idx = min(len(strikes)-1, atm_idx + 2)
+            leg2_strike = strikes[leg2_idx]
+            
+        leg1_row = target_opts[target_opts['SEM_STRIKE_PRICE'] == leg1_strike].iloc[0]
+        leg2_row = target_opts[target_opts['SEM_STRIKE_PRICE'] == leg2_strike].iloc[0]
+        
+        return leg1_row['SEM_CUSTOM_SYMBOL'], leg2_row['SEM_CUSTOM_SYMBOL'], int(leg1_row['SEM_LOT_UNITS'])
+    except Exception as e:
+        logger.error(f"Error finding spread legs for {symbol}: {e}")
+        return None, None, 1
 
 def compute_signals(df, strategy_name='WPR_CROSS_EMA'):
     if df is None or len(df) < 20:
@@ -281,6 +339,8 @@ def scanner_loop(client_id, access_token, dhan_pin=None, dhan_totp=None, tg_bot=
     try:
         cleanup_old_csvs()
         tsl = Tradehull(client_id, mode="pin_totp", pin=dhan_pin, totp_secret=dhan_totp) if dhan_pin and dhan_totp else Tradehull(client_id, access_token, mode="access_token")
+        if not hasattr(tsl, 'Dhan'):
+            raise Exception("Tradehull initialization failed silently due to invalid credentials or OTP.")
     except Exception as e:
         logger.error(f"Failed to init Tradehull: {e}")
         _scanner_running = False
@@ -339,18 +399,21 @@ def scanner_loop(client_id, access_token, dhan_pin=None, dhan_totp=None, tg_bot=
                 conn.commit()
 
                 # Check existing open trades
-                cursor.execute("SELECT id, trade_type, spot_entry, premium_entry, stop_loss, target FROM paper_trades WHERE symbol=? AND status='OPEN'", (symbol,))
+                cursor.execute("SELECT id, trade_type, spread_type, spot_entry, leg1_symbol, leg2_symbol, lot_size, leg1_entry_price, leg2_entry_price, net_premium_entry, stop_loss, target FROM paper_trades WHERE symbol=? AND status='OPEN'", (symbol,))
                 open_trades = cursor.fetchall()
                 
-                for t_id, t_type, spot_entry, qty, sl, tgt in open_trades:
-                    # In this equity mode, premium_entry = qty
-                    current_value = ltp * qty
-                    entry_value = spot_entry * qty
+                for t_id, t_type, spread_type, spot_entry, leg1_sym, leg2_sym, lot_size, leg1_entry, leg2_entry, net_entry, sl, tgt in open_trades:
+                    try:
+                        opt_ltps = tsl.get_ltp_data(names=[leg1_sym, leg2_sym])
+                        leg1_ltp = opt_ltps.get(leg1_sym, leg1_entry)
+                        leg2_ltp = opt_ltps.get(leg2_sym, leg2_entry)
+                    except:
+                        leg1_ltp, leg2_ltp = leg1_entry, leg2_entry
+                        
+                    net_current = leg1_ltp - leg2_ltp
                     
-                    if t_type == "LONG":
-                        pnl = current_value - entry_value
-                    else:
-                        pnl = entry_value - current_value
+                    # Credit spread: PNL = (net_entry - net_current) * lot_size
+                    pnl = (net_entry - net_current) * lot_size
                         
                     status = 'OPEN'
                     if (t_type == "LONG" and ltp <= sl) or (t_type == "SHORT" and ltp >= sl):
@@ -360,14 +423,14 @@ def scanner_loop(client_id, access_token, dhan_pin=None, dhan_totp=None, tg_bot=
                         
                     cursor.execute('''
                         UPDATE paper_trades 
-                        SET pnl=?, status=?, exit_time=?, exit_premium=? 
+                        SET pnl=?, status=?, exit_time=?, exit_spot=?, leg1_exit_price=?, leg2_exit_price=?, net_premium_exit=?
                         WHERE id=?
-                    ''', (pnl, status, datetime.now(IST).isoformat() if status != 'OPEN' else None, ltp if status != 'OPEN' else None, t_id))
+                    ''', (pnl, status, datetime.now(IST).isoformat() if status != 'OPEN' else None, ltp if status != 'OPEN' else None, leg1_ltp if status != 'OPEN' else None, leg2_ltp if status != 'OPEN' else None, net_current if status != 'OPEN' else None, t_id))
                     conn.commit()
                     
                     if status != 'OPEN' and tg_bot and tg_chat:
                         try:
-                            msg = f"PAPER EXIT: {symbol} {t_type} {status}. PNL: ₹{pnl:.2f}. Exit Price: {ltp}"
+                            msg = f"PAPER EXIT: {symbol} {spread_type} {status}.\nSpot Exit: {ltp:.2f}\nTotal PNL: ₹{pnl:.2f}\nLeg1 {leg1_sym} Exit: {leg1_ltp}\nLeg2 {leg2_sym} Exit: {leg2_ltp}"
                             send_alert_with_buttons(bot_token=tg_bot, chat_id=tg_chat, text=msg, symbol=symbol, ltp=ltp)
                         except: pass
 
@@ -375,10 +438,22 @@ def scanner_loop(client_id, access_token, dhan_pin=None, dhan_totp=None, tg_bot=
                 if signal in ["LONG", "SHORT"]:
                     cursor.execute("SELECT id FROM paper_trades WHERE symbol=? AND status='OPEN'", (symbol,))
                     if not cursor.fetchone():
-                        qty = max(1, int(10000 / ltp))
-                        opt_sym = f"{symbol} EQ"
+                        leg1_sym, leg2_sym, lot_size = get_spread_legs(symbol, ltp, signal)
+                        if not leg1_sym:
+                            logger.error(f"Could not find options spread for {symbol}. Skipping.")
+                            continue
+                            
+                        try:
+                            opt_ltps = tsl.get_ltp_data(names=[leg1_sym, leg2_sym])
+                            leg1_entry = opt_ltps.get(leg1_sym, 0)
+                            leg2_entry = opt_ltps.get(leg2_sym, 0)
+                            net_entry = leg1_entry - leg2_entry
+                        except:
+                            leg1_entry, leg2_entry, net_entry = 0, 0, 0
                         
-                        # 3% SL, 3% Target
+                        spread_type = "BULL_PUT_SPREAD" if signal == "LONG" else "BEAR_CALL_SPREAD"
+                        
+                        # 3% SL, 3% Target on underlying
                         if signal == "LONG":
                             sl = ltp * 0.97
                             tgt = ltp * 1.03
@@ -387,15 +462,19 @@ def scanner_loop(client_id, access_token, dhan_pin=None, dhan_totp=None, tg_bot=
                             tgt = ltp * 0.97
                         
                         cursor.execute('''
-                            INSERT INTO paper_trades (symbol, trade_type, option_symbol, entry_time, spot_entry, premium_entry, stop_loss, target, status, pnl)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'OPEN', 0.0)
-                        ''', (symbol, signal, opt_sym, datetime.now(IST).isoformat(), ltp, qty, sl, tgt))
+                            INSERT INTO paper_trades (symbol, trade_type, spread_type, leg1_symbol, leg2_symbol, lot_size, entry_time, spot_entry, leg1_entry_price, leg2_entry_price, net_premium_entry, stop_loss, target, status, pnl)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'OPEN', 0.0)
+                        ''', (symbol, signal, spread_type, leg1_sym, leg2_sym, lot_size, datetime.now(IST).isoformat(), ltp, leg1_entry, leg2_entry, net_entry, sl, tgt))
                         conn.commit()
+                        trade_id = cursor.lastrowid
                         
                         if tg_bot and tg_chat:
                             try:
-                                msg = f"PAPER ENTRY: {signal} {qty} {symbol} at {ltp}. SL: {sl:.2f}, TGT: {tgt:.2f}"
-                                send_alert_with_buttons(bot_token=tg_bot, chat_id=tg_chat, text=msg, symbol=symbol, ltp=ltp)
+                                msg = f"PAPER ENTRY: {symbol} {spread_type} at Spot {ltp:.2f}\nSELL Leg: {leg1_sym} at {leg1_entry:.2f}\nBUY Leg: {leg2_sym} at {leg2_entry:.2f}\nNet Premium: {net_entry:.2f} | Lot Size: {lot_size}\nSpot Target: {tgt:.2f} | Spot SL: {sl:.2f}"
+                                
+                                # We pass trade_id as ltp here so telegram_listener can capture it. 
+                                # The callback_data max length is 64. "BUY_{symbol}_{trade_id}" will fit.
+                                send_alert_with_buttons(bot_token=tg_bot, chat_id=tg_chat, text=msg, symbol=symbol, ltp=float(trade_id))
                             except Exception as e:
                                 logger.error(f"Error sending TG alert: {e}")
                                 
@@ -406,13 +485,17 @@ def scanner_loop(client_id, access_token, dhan_pin=None, dhan_totp=None, tg_bot=
             except Exception as e:
                 err_str = str(e)
                 logger.error(f"Error processing {symbol}: {err_str}")
-                if 'DH-901' in err_str or 'expired' in err_str.lower():
+                if 'DH-901' in err_str or 'expired' in err_str.lower() or 'instrument_df' in err_str:
                     interceptor.token_expired = False
                     if dhan_pin and dhan_totp:
-                        logger.info("Access token expired. Regenerating...")
+                        logger.info("Access token expired or Tradehull broken. Regenerating...")
                         try:
                             new_tsl = Tradehull(client_id, mode="pin_totp", pin=dhan_pin, totp_secret=dhan_totp)
+                            if not hasattr(new_tsl, 'Dhan'):
+                                raise Exception("Failed to regenerate Tradehull: Invalid TOTP or credentials.")
                             tsl = Tradehull(client_id, new_tsl.token_id, mode="access_token")
+                            if not hasattr(tsl, 'Dhan'):
+                                raise Exception("Failed to initialize Tradehull with new token.")
                             
                             stop_telegram_listener()
                             time.sleep(2)
@@ -457,6 +540,8 @@ def start_scanner(client_id, access_token, dhan_pin=None, dhan_totp=None, tg_bot
     if dhan_pin and dhan_totp:
         try:
             tsl_temp = Tradehull(client_id, mode="pin_totp", pin=dhan_pin, totp_secret=dhan_totp)
+            if not hasattr(tsl_temp, 'Dhan'):
+                raise Exception("Invalid credentials or OTP")
             access_token = tsl_temp.token_id
         except Exception as e:
             return {"status": "error", "message": f"Login failed: {str(e)}"}

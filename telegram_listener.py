@@ -17,8 +17,7 @@ def send_alert_with_buttons(bot_token, chat_id, text, symbol, ltp):
         "reply_markup": {
             "inline_keyboard": [
                 [
-                    {"text": "🟢 BUY LIMIT", "callback_data": f"BUY_{symbol}_{ltp}"},
-                    {"text": "🔴 SELL LIMIT", "callback_data": f"SELL_{symbol}_{ltp}"}
+                    {"text": "🚀 EXECUTE SPREAD (BUY LIMIT)", "callback_data": f"EXECUTE_{symbol}_{ltp}"}
                 ],
                 [
                     {"text": "⚪ IGNORE", "callback_data": f"IGNORE_{symbol}_{ltp}"}
@@ -39,6 +38,9 @@ def telegram_polling_loop(client_id, access_token, dhan_pin, dhan_totp, tg_bot, 
     tsl = None
     try:
         tsl = Tradehull(client_id, access_token, mode="access_token")
+        if not hasattr(tsl, 'Dhan'):
+            raise Exception("Tradehull initialization failed silently.")
+            
         import os, pandas as pd
         if os.path.exists('api-scrip-master.csv'):
             tsl.instrument_df = pd.read_csv('api-scrip-master.csv', low_memory=False)
@@ -91,81 +93,82 @@ def telegram_polling_loop(client_id, access_token, dhan_pin, dhan_totp, tg_bot, 
                         continue
                         
                     parts = action_data.split('_')
-                    if len(parts) == 3:
+                    if len(parts) >= 3:
                         action = parts[0]
                         symbol = parts[1]
-                        ltp = float(parts[2])
-                        
-                        qty = 1 # Default qty
+                        trade_id = int(float(parts[2]))
                         
                         requests.post(f"https://api.telegram.org/bot{tg_bot}/sendMessage", json={
                             "chat_id": chat_id,
-                            "text": f"⚙️ Executing {action} on {symbol} at {ltp} via AlgoScan..."
+                            "text": f"⚙️ Executing Spread for {symbol} (Trade ID: {trade_id}) via AlgoScan..."
                         })
                         
-                        logger.info(f"Executing Telegram Order: {action} on {symbol} at {ltp}")
+                        logger.info(f"Executing Telegram Spread Order: {symbol} (ID: {trade_id})")
                         try:
-                            # Fire raw limit order using Tradehull Token
-                            target_exchange = "BSE" if symbol in corrupt_symbols else "NSE"
-                            target_segment = "BSE_EQ" if target_exchange == "BSE" else "NSE_EQ"
+                            import sqlite3
+                            conn = sqlite3.connect("algo_lab.db")
+                            cursor = conn.cursor()
+                            cursor.execute("SELECT leg1_symbol, leg2_symbol, lot_size FROM paper_trades WHERE id=?", (trade_id,))
+                            row = cursor.fetchone()
+                            conn.close()
                             
-                            logger.info(f"Routing {symbol} order to {target_exchange} due to Dhan ID bug" if target_exchange == "BSE" else f"Routing {symbol} to normal {target_exchange}")
-                            
-                            sec_id = str(tsl._resolve_security_id(symbol, target_exchange))
-                            logger.info(f"Resolved Security ID for {symbol}: {sec_id}")
-                            payload = {
-                                "dhanClientId": client_id,
-                                "transactionType": action,
-                                "exchangeSegment": target_segment,
-                                "productType": "CNC",
-                                "orderType": "LIMIT",
-                                "validity": "DAY",
-                                "securityId": sec_id,
-                                "quantity": qty,
-                                "disclosedQuantity": 0,
-                                "price": ltp,
-                                "triggerPrice": 0.0,
-                                "afterMarketOrder": False
-                            }
-                            headers = {
-                                "Content-Type": "application/json",
-                                "access-token": tsl.token_id
-                            }
-                            order_resp = requests.post("https://api.dhan.co/v2/orders", json=payload, headers=headers)
-                            o_data = order_resp.json()
-                            
-                            if order_resp.status_code == 200 and o_data.get('orderStatus') != 'REJECTED':
-                                txt = f"✅ {action} Order Placed for {symbol}!\nOrder ID: {o_data.get('orderId', 'N/A')}"
+                            if not row:
+                                raise Exception(f"Trade ID {trade_id} not found in DB.")
                                 
-                                # Attach Forever Order (GTT OCO) for Longterm trades (CNC)
-                                if action == "BUY":
-                                    tgt_trigger = round(ltp * 1.03, 1)
-                                    sl_trigger = round(ltp * 0.97, 1)
-                                    try:
-                                        fid = tsl.place_forever_order(
-                                            tradingsymbol=symbol, exchange=target_exchange,
-                                            transaction_type="SELL", quantity=qty,
-                                            order_type="LIMIT", trade_type="CNC",
-                                            price=tgt_trigger, trigger_price=tgt_trigger,
-                                            order_flag="OCO",
-                                            quantity_1=qty, price_1=sl_trigger, trigger_price_1=sl_trigger
-                                        )
-                                        txt += f"\n🎯 Target & SL (GTT) placed!\nGTT ID: {fid}"
-                                    except Exception as e:
-                                        txt += f"\n⚠️ GTT Failed: {str(e)}"
-                            else:
-                                txt = f"❌ Order Failed: {o_data.get('remarks', o_data.get('errorMessage', 'Unknown'))}"
-                            logger.info(txt)
+                            leg1_sym, leg2_sym, lot_size = row
+                            
+                            opt_ltps = tsl.get_ltp_data(names=[leg1_sym, leg2_sym])
+                            leg1_ltp = opt_ltps.get(leg1_sym)
+                            leg2_ltp = opt_ltps.get(leg2_sym)
+                            
+                            if not leg1_ltp or not leg2_ltp:
+                                raise Exception(f"Could not fetch live prices for {leg1_sym} or {leg2_sym}")
                                 
+                            # Execute BUY Leg (Leg 2) FIRST for margin benefit
+                            # Limit price slightly above LTP for instant execution
+                            leg2_limit = round(leg2_ltp * 1.02, 1)
+                            logger.info(f"Firing BUY Leg: {leg2_sym} at {leg2_limit}")
+                            order1_id = tsl.order_placement(
+                                tradingsymbol=leg2_sym,
+                                exchange="NFO",
+                                quantity=lot_size,
+                                price=leg2_limit,
+                                trigger_price=0,
+                                order_type="LIMIT",
+                                transaction_type="BUY",
+                                trade_type="MARGIN"
+                            )
+                            time.sleep(1)
+                            
+                            # Execute SELL Leg (Leg 1) SECOND
+                            # Limit price slightly below LTP for instant execution
+                            leg1_limit = round(leg1_ltp * 0.98, 1)
+                            logger.info(f"Firing SELL Leg: {leg1_sym} at {leg1_limit}")
+                            order2_id = tsl.order_placement(
+                                tradingsymbol=leg1_sym,
+                                exchange="NFO",
+                                quantity=lot_size,
+                                price=leg1_limit,
+                                trigger_price=0,
+                                order_type="LIMIT",
+                                transaction_type="SELL",
+                                trade_type="MARGIN"
+                            )
+                            
+                            txt = f"✅ Spread Executed for {symbol}!\nBUY Leg ({leg2_sym}): {order1_id}\nSELL Leg ({leg1_sym}): {order2_id}"
+                            
                             requests.post(f"https://api.telegram.org/bot{tg_bot}/editMessageText", json={
                                 "chat_id": chat_id,
                                 "message_id": msg_id,
                                 "text": cb["message"]["text"] + f"\n\n{txt}"
                             })
+                            
                         except Exception as e:
-                            requests.post(f"https://api.telegram.org/bot{tg_bot}/sendMessage", json={
+                            logger.error(f"Failed to execute spread for {symbol}: {e}")
+                            requests.post(f"https://api.telegram.org/bot{tg_bot}/editMessageText", json={
                                 "chat_id": chat_id,
-                                "text": f"❌ Error placing trade: {str(e)}"
+                                "message_id": msg_id,
+                                "text": cb["message"]["text"] + f"\n\n❌ Execution Failed: {str(e)}"
                             })
                             
         except Exception as e:
