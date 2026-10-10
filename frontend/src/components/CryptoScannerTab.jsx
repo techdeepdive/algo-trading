@@ -4,6 +4,7 @@ import { Loader2 } from 'lucide-react';
 const CryptoScannerTab = ({ credentials }) => {
   const [engineState, setEngineState] = useState('idle');
   const [stats, setStats] = useState({});
+  const [tradeModal, setTradeModal] = useState({ open: false, symbol: '', signal: '', ltp: 0, sl: 0, tgt: 0 });
   const [trades, setTrades] = useState([]);
   const [scannerState, setScannerState] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -387,6 +388,76 @@ const CryptoScannerTab = ({ credentials }) => {
         </div>
 
       </div>
+      {tradeModal.open && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-70 z-50">
+          <div className="bg-[#1B1E2E] p-6 rounded-xl border border-gray-700 w-96 shadow-2xl">
+            <h3 className="text-xl font-bold text-white mb-4">Execute Trade: {tradeModal.symbol}</h3>
+            
+            <div className="mb-4">
+              <span className="text-gray-400 text-sm">LTP:</span>
+              <span className="text-white ml-2 font-mono">${tradeModal.ltp}</span>
+            </div>
+            
+            <div className="flex gap-2 mb-4">
+              <button 
+                onClick={() => {
+                  const sl = tradeModal.ltp * 0.97;
+                  const tgt = tradeModal.ltp * 1.04;
+                  setTradeModal({ ...tradeModal, signal: 'LONG', sl: parseFloat(sl.toFixed(4)), tgt: parseFloat(tgt.toFixed(4)) });
+                }}
+                className={`flex-1 py-2 rounded font-bold transition-all ${tradeModal.signal === 'LONG' ? 'bg-green-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}
+              >
+                LONG
+              </button>
+              <button 
+                onClick={() => {
+                  const sl = tradeModal.ltp * 1.03;
+                  const tgt = tradeModal.ltp * 0.96;
+                  setTradeModal({ ...tradeModal, signal: 'SHORT', sl: parseFloat(sl.toFixed(4)), tgt: parseFloat(tgt.toFixed(4)) });
+                }}
+                className={`flex-1 py-2 rounded font-bold transition-all ${tradeModal.signal === 'SHORT' ? 'bg-red-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}
+              >
+                SHORT
+              </button>
+            </div>
+            
+            <div className="mb-4">
+              <label className="block text-gray-400 text-sm mb-1">Target Price (+20% Capital)</label>
+              <input 
+                type="number" 
+                value={tradeModal.tgt} 
+                onChange={(e) => setTradeModal({...tradeModal, tgt: parseFloat(e.target.value)})}
+                className="w-full bg-[#0F111A] text-white px-3 py-2 rounded border border-gray-600 focus:outline-none focus:border-blue-500 font-mono"
+              />
+            </div>
+            
+            <div className="mb-6">
+              <label className="block text-gray-400 text-sm mb-1">Stop Loss (-15% Capital)</label>
+              <input 
+                type="number" 
+                value={tradeModal.sl} 
+                onChange={(e) => setTradeModal({...tradeModal, sl: parseFloat(e.target.value)})}
+                className="w-full bg-[#0F111A] text-white px-3 py-2 rounded border border-gray-600 focus:outline-none focus:border-blue-500 font-mono"
+              />
+            </div>
+            
+            <div className="flex justify-end gap-3">
+              <button 
+                onClick={() => setTradeModal({ ...tradeModal, open: false })}
+                className="px-4 py-2 rounded text-gray-300 hover:bg-gray-700 transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={confirmTrade}
+                className="px-6 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-lg shadow-blue-500/20 transition-all"
+              >
+                Execute
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

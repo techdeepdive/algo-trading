@@ -959,8 +959,15 @@ def execute_crypto_trade():
             "leverage": "5"
         }))
         
-        sl = ltp * 0.97 if signal == "LONG" else ltp * 1.03
-        tgt = ltp * 1.04 if signal == "LONG" else ltp * 0.96
+        sl = data.get('sl')
+        tgt = data.get('tgt')
+        if not sl:
+            sl = ltp * 0.97 if signal == "LONG" else ltp * 1.03
+        if not tgt:
+            tgt = ltp * 1.04 if signal == "LONG" else ltp * 0.96
+            
+        sl = float(sl)
+        tgt = float(tgt)
 
         # 2. Place Order with Brackets
         order_payload = {
