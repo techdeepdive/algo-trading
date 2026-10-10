@@ -14,7 +14,7 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('crypto_scanner')
 
-CRYPTO_SYMBOLS = ["BTC", "ETH", "SOL", "HYPE", "ZEC", "TAO", "ONDO", "LINK", "NEAR", "DOGE", "BNB", "AVAX", "LTC", "ENA", "ARB", "WLD", "ADA", "DOT", "AXS", "SUI", "TLM", "ICP", "VIRTUAL", "SHIB", "PEPE", "OM", "UNI", "XRP", "TRX", "SAND", "ETHFI"]
+CRYPTO_SYMBOLS = ['BTC', 'ETH', 'SOL', 'HYPE', 'ZEC', 'TAO', 'ONDO', 'LINK', 'NEAR', 'DOGE', 'BNB', 'AVAX', 'LTC', 'ENA', 'ARB', 'WLD', 'ADA', 'DOT', 'AXS', 'SUI', 'TLM', 'VIRTUAL', '1000SHIB', '1000PEPE', 'UNI', 'XRP', 'TRX', 'ETHFI']
 API_URL = "https://api.india.delta.exchange"
 DB_NAME = "crypto_lab.db"
 
