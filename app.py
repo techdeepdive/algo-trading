@@ -977,7 +977,11 @@ def execute_crypto_trade():
         order_data = order_res.json() if order_res else {}
         
         if not order_data.get('success'):
-            return jsonify({"status": "error", "message": f"Order failed: {order_data.get('error', 'Unknown')}"}), 400
+            print(f"ORDER FAILED: {order_res.text if order_res else 'No response'}")
+            err_msg = order_data.get('error')
+            if isinstance(err_msg, dict):
+                err_msg = err_msg.get('message', str(err_msg))
+            return jsonify({"status": "error", "message": f"Order failed: {err_msg or order_res.text}"}), 400
             
         # Add to local DB
         import sqlite3
