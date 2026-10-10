@@ -916,7 +916,7 @@ def execute_crypto_trade():
     print(f"Manual Crypto Trade Requested: {data.get('signal')} on {data.get('symbol')}")
     api_key = request.headers.get('Delta-Api-Key')
     import json
-    API_URL = 'https://api.delta.exchange'
+    API_URL = 'https://api.india.delta.exchange'
     api_secret = request.headers.get('Delta-Api-Secret')
     
     if not api_key or not api_secret:
@@ -931,7 +931,7 @@ def execute_crypto_trade():
 
     try:
         # Get product_id for the symbol
-        res = requests.get(f"https://api.delta.exchange/v2/products")
+        res = requests.get(f"https://api.india.delta.exchange/v2/products")
         products = res.json().get('result', [])
         
         target_symbol = f"{symbol}USD"
