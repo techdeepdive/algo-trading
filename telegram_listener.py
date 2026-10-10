@@ -94,6 +94,41 @@ def telegram_polling_loop(client_id, access_token, dhan_pin, dhan_totp, tg_bot, 
                         continue
                         
                     parts = action_data.split('_')
+                    
+                    if parts[0] == 'CRYPTO' and len(parts) >= 4:
+                        symbol = parts[1]
+                        signal = parts[2]
+                        ltp = float(parts[3])
+                        
+                        logger.info(f"Executing Telegram Crypto Order: {signal} on {symbol}")
+                        
+                        try:
+                            headers = {
+                                'Content-Type': 'application/json',
+                                'Delta-Api-Key': _delta_api_key or '',
+                                'Delta-Api-Secret': _delta_api_secret or ''
+                            }
+                            payload = {"symbol": symbol, "signal": signal, "ltp": ltp}
+                            
+                            res = requests.post("http://127.0.0.1:5001/api/crypto/execute_trade", headers=headers, json=payload, timeout=10)
+                            data = res.json()
+                            
+                            if data.get("status") == "success":
+                                txt = f"✅ {signal} Trade Executed for {symbol} at {ltp}!\\n{data.get('message', '')}"
+                            else:
+                                txt = f"❌ Execution Failed: {data.get('message', '')}"
+                                
+                        except Exception as e:
+                            logger.error(f"Failed to execute crypto trade for {symbol}: {e}")
+                            txt = f"❌ Backend Error: {str(e)}"
+                            
+                        requests.post(f"https://api.telegram.org/bot{tg_bot}/editMessageText", json={
+                            "chat_id": chat_id,
+                            "message_id": msg_id,
+                            "text": cb["message"]["text"] + f"\n\n{txt}"
+                        })
+                        continue
+                        
                     if len(parts) >= 3:
                         action = parts[0]
                         symbol = parts[1]
@@ -175,7 +210,13 @@ def telegram_polling_loop(client_id, access_token, dhan_pin, dhan_totp, tg_bot, 
         except Exception as e:
             time.sleep(2)
 
-def start_telegram_listener(client_id, access_token, dhan_pin, dhan_totp, tg_bot, tg_chat):
+_delta_api_key = None
+_delta_api_secret = None
+
+def start_telegram_listener(client_id, access_token, dhan_pin, dhan_totp, tg_bot, tg_chat, delta_api_key=None, delta_api_secret=None):
+    global _delta_api_key, _delta_api_secret
+    _delta_api_key = delta_api_key
+    _delta_api_secret = delta_api_secret
     global _tg_thread, _tg_running
     if _tg_running or not tg_bot or not tg_chat:
         return

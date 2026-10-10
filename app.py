@@ -821,7 +821,7 @@ def api_start_crypto():
     res = delta_request('GET', '/v2/wallet/balances', api_key, api_secret)
     if res and res.status_code == 200:
         start_crypto_scanner(api_key, api_secret, tg_bot, tg_chat)
-        start_telegram_listener("dummy", "dummy", None, None, tg_bot, tg_chat)
+        start_telegram_listener("dummy", "dummy", None, None, tg_bot, tg_chat, delta_api_key=api_key, delta_api_secret=api_secret)
         return jsonify({"status": "success", "message": "Crypto Scanner Started!"})
     else:
         err = res.text if res else "Connection Error"
