@@ -35,25 +35,25 @@ def telegram_polling_loop(client_id, access_token, dhan_pin, dhan_totp, tg_bot, 
     global _tg_running
     offset = 0
     
-    # Init Tradehull instance for telegram orders
     tsl = None
-    try:
-        tsl = Tradehull(client_id, access_token, mode="access_token")
-        if not hasattr(tsl, 'Dhan'):
-            raise Exception("Tradehull initialization failed silently.")
-            
-        import os, pandas as pd
-        if os.path.exists('api-scrip-master.csv'):
-            tsl.instrument_df = pd.read_csv('api-scrip-master.csv', low_memory=False)
-            
-        df = tsl.instrument_df
-        nse_eq = df[(df['SEM_EXM_EXCH_ID'] == 'NSE') & (df['SEM_SEGMENT'] == 'E')]
-        nse_other = df[(df['SEM_EXM_EXCH_ID'] == 'NSE') & (df['SEM_SEGMENT'] != 'E')]
-        dups = set(nse_eq['SEM_SMST_SECURITY_ID']).intersection(set(nse_other['SEM_SMST_SECURITY_ID']))
-        corrupt_symbols = set(nse_eq[nse_eq['SEM_SMST_SECURITY_ID'].isin(dups)]['SEM_TRADING_SYMBOL'])
-    except Exception as e:
-        logger.error(f"Failed to init Tradehull for Telegram bot: {e}")
-        return
+    if client_id != "dummy":
+        try:
+            tsl = Tradehull(client_id, access_token, mode="access_token")
+            if not hasattr(tsl, 'Dhan'):
+                raise Exception("Tradehull initialization failed silently.")
+                
+            import os, pandas as pd
+            if os.path.exists('api-scrip-master.csv'):
+                tsl.instrument_df = pd.read_csv('api-scrip-master.csv', low_memory=False)
+                
+            df = tsl.instrument_df
+            nse_eq = df[(df['SEM_EXM_EXCH_ID'] == 'NSE') & (df['SEM_SEGMENT'] == 'E')]
+            nse_other = df[(df['SEM_EXM_EXCH_ID'] == 'NSE') & (df['SEM_SEGMENT'] != 'E')]
+            dups = set(nse_eq['SEM_SMST_SECURITY_ID']).intersection(set(nse_other['SEM_SMST_SECURITY_ID']))
+            corrupt_symbols = set(nse_eq[nse_eq['SEM_SMST_SECURITY_ID'].isin(dups)]['SEM_TRADING_SYMBOL'])
+        except Exception as e:
+            logger.error(f"Failed to init Tradehull for Telegram bot: {e}")
+            return
 
     while _tg_running:
         try:
