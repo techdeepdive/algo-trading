@@ -7,6 +7,7 @@ const CryptoScannerTab = ({ credentials }) => {
   const [trades, setTrades] = useState([]);
   const [scannerState, setScannerState] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [balance, setBalance] = useState(null);
 
   useEffect(() => {
@@ -22,7 +23,7 @@ const CryptoScannerTab = ({ credentials }) => {
     fetchState();
     const intv = setInterval(fetchState, 5000);
     return () => clearInterval(intv);
-  }, []);
+  }, [refreshTrigger]);
 
   useEffect(() => {
     const fetchTrades = async () => {
@@ -39,7 +40,7 @@ const CryptoScannerTab = ({ credentials }) => {
     fetchTrades();
     const intv = setInterval(fetchTrades, 5000);
     return () => clearInterval(intv);
-  }, []);
+  }, [refreshTrigger]);
 
   
   useEffect(() => {
@@ -58,7 +59,7 @@ const CryptoScannerTab = ({ credentials }) => {
     fetchScannerState();
     const intv = setInterval(fetchScannerState, 5000);
     return () => clearInterval(intv);
-  }, []);
+  }, [refreshTrigger]);
 
   const fetchBalance = async () => {
     setLoading(true);
@@ -80,12 +81,44 @@ const CryptoScannerTab = ({ credentials }) => {
     setLoading(false);
   };
 
-    const clearCryptoData = async () => {
+    
+  const executeLiveTrade = async (symbol, signal, ltp) => {
+    let finalSignal = signal;
+    if (signal === 'NEUTRAL') {
+      const manual = window.prompt(`Force trade for ${symbol} at ${ltp}?\nEnter 'LONG' or 'SHORT':`);
+      if (manual && (manual.toUpperCase() === 'LONG' || manual.toUpperCase() === 'SHORT')) {
+        finalSignal = manual.toUpperCase();
+      } else {
+        return;
+      }
+    } else {
+      if (!window.confirm(`Execute ${signal} on ${symbol} at ${ltp}?`)) return;
+    }
+
+    try {
+      const res = await fetch('/api/crypto/execute_trade', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ symbol, signal: finalSignal, ltp })
+      });
+      const data = await res.json();
+      if (data.status === 'success') {
+        alert(data.message);
+        setRefreshTrigger(r => r + 1);
+      } else {
+        alert(data.message);
+      }
+    } catch (e) {
+      alert("Failed to execute live trade");
+    }
+  };
+
+  const clearCryptoData = async () => {
     if (!window.confirm("Are you sure you want to clear all crypto paper trades?")) return;
     try {
       const res = await fetch('/api/crypto/clear_trades', { method: 'POST' });
       const data = await res.json();
-      if (data.status === 'success') window.location.reload();
+      if (data.status === 'success') setRefreshTrigger(r => r + 1);
       else alert(data.message);
     } catch (e) {
       alert("Failed to clear data");
