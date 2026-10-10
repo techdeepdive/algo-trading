@@ -48,7 +48,7 @@ function App() {
   ];
 
   return (
-    <div className="max-w-7xl mx-auto p-6 space-y-6">
+    <div className="w-full max-w-[98%] mx-auto p-6 space-y-6">
       <header className="flex justify-between items-center pb-4 border-b border-slate-800">
         <div className="flex items-center gap-4">
           <div className="w-11 h-11 bg-indigo-600 rounded-xl shadow-lg border border-slate-700 flex items-center justify-center text-white font-bold text-xl">
