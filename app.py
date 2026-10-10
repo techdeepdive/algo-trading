@@ -957,12 +957,18 @@ def execute_crypto_trade():
             "leverage": "5"
         })
         
-        # 2. Place Order
+        sl = ltp * 0.97 if signal == "LONG" else ltp * 1.03
+        tgt = ltp * 1.04 if signal == "LONG" else ltp * 0.96
+
+        # 2. Place Order with Brackets
         order_payload = {
             "product_id": product_id,
             "size": size,
             "side": "buy" if signal == "LONG" else "sell",
-            "order_type": "market_order"
+            "order_type": "market_order",
+            "bracket_stop_loss_price": str(round(sl, 4)),
+            "bracket_take_profit_price": str(round(tgt, 4)),
+            "bracket_stop_trigger_method": "last_traded_price"
         }
         
         order_res = delta_request(api_key, api_secret, 'POST', '/v2/orders', order_payload)
@@ -976,8 +982,6 @@ def execute_crypto_trade():
         import datetime
         conn = sqlite3.connect('crypto_lab.db')
         c = conn.cursor()
-        sl = ltp * 0.97 if signal == "LONG" else ltp * 1.03
-        tgt = ltp * 1.04 if signal == "LONG" else ltp * 0.96
         c.execute("INSERT INTO crypto_trades (symbol, trade_type, entry_time, entry_price, current_price, stop_loss, target, status, pnl) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                   (symbol, signal, datetime.datetime.now(pytz.timezone('Asia/Kolkata')).strftime("%Y-%m-%d %H:%M:%S"), ltp, ltp, sl, tgt, 'OPEN', 0.0))
         conn.commit()
