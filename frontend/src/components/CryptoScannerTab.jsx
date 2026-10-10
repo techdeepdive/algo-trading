@@ -267,6 +267,7 @@ const CryptoScannerTab = ({ credentials }) => {
                     <th className="px-4 py-2 font-semibold text-right">5 EMA</th>
                     <th className="px-4 py-2 font-semibold text-right">15 EMA</th>
                     <th className="px-4 py-2 font-semibold text-right">50 EMA</th>
+                    <th className="px-4 py-2 font-semibold text-center">FAST &gt; SLOW</th>
                     <th className="px-4 py-2 font-semibold text-right">Time</th>
                     <th className="px-4 py-2 font-semibold text-center">Action</th>
                   </tr>
@@ -292,6 +293,15 @@ const CryptoScannerTab = ({ credentials }) => {
                       <td className="px-4 py-2 text-right text-indigo-300">{s.ema_fast ? s.ema_fast.toFixed(6) : '-'}</td>
                       <td className="px-4 py-2 text-right text-indigo-400">{s.ema_mid ? s.ema_mid.toFixed(6) : '-'}</td>
                       <td className="px-4 py-2 text-right text-slate-400">{s.ema_slow ? s.ema_slow.toFixed(6) : '-'}</td>
+                      <td className="px-4 py-2 text-center">
+                        {s.ema_fast && s.ema_slow ? (
+                          s.ema_fast > s.ema_slow ? (
+                            <span className="bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded text-xs font-bold">YES</span>
+                          ) : (
+                            <span className="bg-rose-500/20 text-rose-400 px-2 py-1 rounded text-xs font-bold">NO</span>
+                          )
+                        ) : '-'}
+                      </td>
                       <td className="px-4 py-2 text-right text-slate-500">{s.timestamp}</td>
                       <td className="px-4 py-2 text-center">
                         <button

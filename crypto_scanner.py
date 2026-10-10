@@ -132,7 +132,7 @@ def crypto_scanner_loop(api_key, api_secret, tg_bot, tg_chat):
     init_db()
     
     logger.info("Crypto Scanner Started")
-    send_telegram("🚀 Crypto Scanner Started (60m TF) via Delta India", tg_bot, tg_chat)
+    send_telegram("🚀 Crypto Scanner Started (15m TF) via Delta India", tg_bot, tg_chat)
     
     while _scanner_running:
         try:
@@ -239,7 +239,7 @@ def crypto_scanner_loop(api_key, api_secret, tg_bot, tg_chat):
         except Exception as e:
             logger.error(f"Crypto Scanner Error: {e}")
             
-        time.sleep(900) # Sleep 5 minutes between 60m scans
+        time.sleep(900) # Sleep 5 minutes between 15m scans
 
 def start_crypto_scanner(api_key, api_secret, tg_bot, tg_chat):
     global _scanner_running
