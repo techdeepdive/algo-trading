@@ -981,10 +981,10 @@ def execute_crypto_trade():
         }
         
         order_res = delta_request('POST', '/v2/orders', api_key, api_secret, json.dumps(order_payload))
-        order_data = order_res.json() if order_res else {}
+        order_data = order_res.json() if order_res is not None else {}
         
         if not order_data.get('success'):
-            print(f"ORDER FAILED: {order_res.text if order_res else 'No response'}")
+            print(f"ORDER FAILED: {order_res.text if order_res is not None else 'No response'}")
             err_msg = order_data.get('error')
             if isinstance(err_msg, dict):
                 err_msg = err_msg.get('message', str(err_msg))
