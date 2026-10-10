@@ -6,7 +6,7 @@ import BacktestTab from './components/BacktestTab';
 import HedgingTab from './components/HedgingTab';
 import NewsTab from './components/NewsTab';
 import ScannerTab from './components/ScannerTab';
-
+import CryptoScannerTab from './components/CryptoScannerTab';
 import ScreenerTab from './components/ScreenerTab';
 
 function App() {
@@ -18,7 +18,9 @@ function App() {
     access_token: '',
     tg_bot: '',
     tg_chat: '',
-    gemini_key: ''
+    gemini_key: '',
+    delta_api_key: '',
+    delta_api_secret: ''
   });
 
   useEffect(() => {
@@ -40,6 +42,7 @@ function App() {
     { id: 'backtest', label: 'Backtesting', icon: Activity },
     { id: 'hedging', label: 'Hedging', icon: ShieldCheck },
     { id: 'scanner', label: 'Live Trade', icon: Activity },
+    { id: 'crypto', label: 'Live Crypto Trade', icon: Activity },
     { id: 'screener', label: 'Screener', icon: Activity },
     { id: 'news', label: 'Market News (AI)', icon: Newspaper },
   ];
@@ -90,7 +93,10 @@ function App() {
                 { name: 'tg_bot', label: 'Telegram Bot Token', placeholder: 'From @BotFather', type: 'password' },
                 { name: 'tg_chat', label: 'Telegram Chat ID', placeholder: 'Your Chat ID', type: 'password' },
                 { separator: true },
-                { name: 'gemini_key', label: 'Gemini API Key', placeholder: 'AI News Hub access...', type: 'password' }
+                { name: 'gemini_key', label: 'Gemini API Key', placeholder: 'AI News Hub access...', type: 'password' },
+                { separator: true },
+                { name: 'delta_api_key', label: 'Delta API Key', placeholder: 'Delta Exchange India', type: 'password' },
+                { name: 'delta_api_secret', label: 'Delta API Secret', placeholder: 'Delta Exchange India', type: 'password' }
               ].map((field, idx) => field.separator ? (
                 <hr key={`hr-${idx}`} className="border-slate-800 my-3" />
               ) : (
@@ -116,6 +122,7 @@ function App() {
           {activeTab === 'backtest' && <BacktestTab credentials={credentials} />}
           {activeTab === 'hedging' && <HedgingTab credentials={credentials} />}
           {activeTab === 'scanner' && <ScannerTab credentials={credentials} />}
+          {activeTab === 'crypto' && <CryptoScannerTab credentials={credentials} />}
           {activeTab === 'screener' && <ScreenerTab credentials={credentials} />}
           {activeTab === 'news' && <NewsTab credentials={credentials} />}
         </div>

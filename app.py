@@ -624,6 +624,8 @@ def api_news():
             
     return jsonify({"status": "success", "news": results})
 
+from scanner_backend import start_scanner, stop_scanner, get_scanner_state, get_paper_trades
+from crypto_scanner import start_crypto_scanner, stop_crypto_scanner, delta_request, DB_NAME as CRYPTO_DB
 from scanner_backend import start_scanner, stop_scanner, get_dashboard_state, run_screener
 
 @app.route("/api/algoscan/screen", methods=["POST"])
@@ -802,6 +804,48 @@ def api_algoscan_trade():
         })
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 400
+
+
+@app.route("/api/crypto/start", methods=["POST"])
+def api_start_crypto():
+    data = request.json
+    api_key = data.get("delta_api_key")
+    api_secret = data.get("delta_api_secret")
+    tg_bot = data.get("tg_bot")
+    tg_chat = data.get("tg_chat")
+    
+    if not api_key or not api_secret:
+        return jsonify({"status": "error", "message": "Delta credentials required"}), 400
+        
+    # Test connection
+    res = delta_request('GET', '/v2/wallet/balances', api_key, api_secret)
+    if res and res.status_code == 200:
+        start_crypto_scanner(api_key, api_secret, tg_bot, tg_chat)
+        start_telegram_listener("dummy", "dummy", None, None, tg_bot, tg_chat)
+        return jsonify({"status": "success", "message": "Crypto Scanner Started!"})
+    else:
+        err = res.text if res else "Connection Error"
+        return jsonify({"status": "error", "message": f"Delta Auth Failed: {err}"}), 400
+
+@app.route("/api/crypto/stop", methods=["POST"])
+def api_stop_crypto():
+    stop_crypto_scanner()
+    return jsonify({"status": "success", "message": "Crypto Scanner Stopped"})
+
+@app.route("/api/crypto/trades", methods=["GET"])
+def api_crypto_trades():
+    import sqlite3
+    try:
+        conn = sqlite3.connect(CRYPTO_DB)
+        c = conn.cursor()
+        c.execute("SELECT * FROM crypto_trades ORDER BY id DESC LIMIT 50")
+        columns = [description[0] for description in c.description]
+        trades = [dict(zip(columns, row)) for row in c.fetchall()]
+        conn.close()
+        return jsonify(trades)
+    except Exception as e:
+        return jsonify([])
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=PORT, debug=False)
