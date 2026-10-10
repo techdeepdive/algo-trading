@@ -184,7 +184,7 @@ const CryptoScannerTab = ({ credentials }) => {
     <div className="space-y-6">
       <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-xl relative overflow-hidden">
         
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
             Crypto Scanner (Delta Exchange)
             <span className={`text-[10px] px-2 py-1 rounded-full font-bold uppercase tracking-wider ${
@@ -194,7 +194,7 @@ const CryptoScannerTab = ({ credentials }) => {
               {engineState}
             </span>
           </h2>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <button
               onClick={clearCryptoData}
               className="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-white font-medium text-sm transition-colors border border-slate-700"
@@ -228,7 +228,7 @@ const CryptoScannerTab = ({ credentials }) => {
           </div>
         </div>
 
-        <div className="grid grid-cols-7 gap-4 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-6">
           <div className="bg-slate-950 border border-slate-800/50 rounded-lg p-4 flex flex-col justify-center">
             <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Delta Balance</div>
             <div className="text-lg font-bold text-white">
