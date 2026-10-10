@@ -85,20 +85,27 @@ const CryptoScannerTab = ({ credentials }) => {
   const executeLiveTrade = async (symbol, signal, ltp) => {
     let finalSignal = signal;
     if (signal === 'NEUTRAL') {
-      const manual = window.prompt(`Force trade for ${symbol} at ${ltp}?\nEnter 'LONG' or 'SHORT':`);
+      const manual = window.prompt(`Force trade for ${symbol} at ${ltp}?\n(Target: +20% Capital, SL: -15% Capital)\nEnter 'LONG' or 'SHORT':`);
       if (manual && (manual.toUpperCase() === 'LONG' || manual.toUpperCase() === 'SHORT')) {
         finalSignal = manual.toUpperCase();
       } else {
         return;
       }
     } else {
-      if (!window.confirm(`Execute ${signal} on ${symbol} at ${ltp}?`)) return;
+      if (!window.confirm(`Execute ${signal} on ${symbol} at ${ltp}?\n(Target: +20% Capital, SL: -15% Capital)`)) return;
     }
+
+    const credsStr = localStorage.getItem('algo_creds');
+    const creds = credsStr ? JSON.parse(credsStr) : {};
 
     try {
       const res = await fetch('/api/crypto/execute_trade', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Delta-Api-Key': creds.delta_api_key || '',
+          'Delta-Api-Secret': creds.delta_api_secret || ''
+        },
         body: JSON.stringify({ symbol, signal: finalSignal, ltp })
       });
       const data = await res.json();
