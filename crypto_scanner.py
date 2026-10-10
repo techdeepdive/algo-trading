@@ -204,10 +204,7 @@ def crypto_scanner_loop(api_key, api_secret, tg_bot, tg_chat):
                             send_telegram(msg, tg_bot, tg_chat, keyboard)
                             
             conn.close()
-        except Exception as e:
-            logger.error(f"Crypto Scanner Error: {e}")
-            
-        global _crypto_state
+            global _crypto_state
             _crypto_state = current_scan_state
         except Exception as e:
             logger.error(f"Crypto Scanner Error: {e}")
