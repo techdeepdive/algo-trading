@@ -68,7 +68,7 @@ def fetch_ohlc(symbol):
     # We fetch last 100 candles.
     end_time = int(time.time())
     start_time = end_time - (100 * 60 * 60)
-    url = f"{API_URL}/v2/history/candles?symbol={symbol}USD&resolution=60&start={start_time}&end={end_time}"
+    url = f"{API_URL}/v2/history/candles?symbol={symbol}USD&resolution=1h&start={start_time}&end={end_time}"
     try:
         res = requests.get(url, timeout=10)
         data = res.json()
