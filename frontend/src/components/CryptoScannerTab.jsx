@@ -4,6 +4,7 @@ import { Loader2 } from 'lucide-react';
 const CryptoScannerTab = ({ credentials }) => {
   const [engineState, setEngineState] = useState('idle');
   const [trades, setTrades] = useState([]);
+  const [scannerState, setScannerState] = useState([]);
   const [loading, setLoading] = useState(false);
   const [balance, setBalance] = useState(null);
 
@@ -36,6 +37,20 @@ const CryptoScannerTab = ({ credentials }) => {
     };
     fetchTrades();
     const intv = setInterval(fetchTrades, 5000);
+    return () => clearInterval(intv);
+  }, []);
+
+  
+  useEffect(() => {
+    const fetchScannerState = async () => {
+      try {
+        const res = await fetch('/api/crypto/scanner_state');
+        const data = await res.json();
+        if (Array.isArray(data)) setScannerState(data);
+      } catch (e) {}
+    };
+    fetchScannerState();
+    const intv = setInterval(fetchScannerState, 5000);
     return () => clearInterval(intv);
   }, []);
 
@@ -161,6 +176,48 @@ const CryptoScannerTab = ({ credentials }) => {
           </div>
         </div>
 
+        
+        {scannerState.length > 0 && (
+          <div className="mb-8">
+            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3">Live Scanner State</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-950/50 border-y border-slate-800 text-slate-400 uppercase tracking-wider text-[10px]">
+                  <tr>
+                    <th className="px-4 py-2 font-semibold text-left">Symbol</th>
+                    <th className="px-4 py-2 font-semibold text-left">Signal</th>
+                    <th className="px-4 py-2 font-semibold text-right">LTP</th>
+                    <th className="px-4 py-2 font-semibold text-right">WPR</th>
+                    <th className="px-4 py-2 font-semibold text-right">5 EMA</th>
+                    <th className="px-4 py-2 font-semibold text-right">15 EMA</th>
+                    <th className="px-4 py-2 font-semibold text-right">50 EMA</th>
+                    <th className="px-4 py-2 font-semibold text-right">Time</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/50">
+                  {scannerState.map((s, i) => (
+                    <tr key={i} className="hover:bg-slate-900/50 transition-colors text-xs">
+                      <td className="px-4 py-2 font-bold text-white">{s.symbol}</td>
+                      <td className={`px-4 py-2 font-bold ${s.signal === 'LONG' ? 'text-emerald-400' : s.signal === 'SHORT' ? 'text-rose-400' : 'text-slate-500'}`}>
+                        {s.signal}
+                      </td>
+                      <td className="px-4 py-2 text-right text-slate-300 font-medium">${s.ltp ? s.ltp.toFixed(2) : '-'}</td>
+                      <td className={`px-4 py-2 text-right font-medium ${s.wpr > -50 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                        {s.wpr ? s.wpr.toFixed(2) : '-'}
+                      </td>
+                      <td className="px-4 py-2 text-right text-indigo-300">{s.ema_fast ? s.ema_fast.toFixed(2) : '-'}</td>
+                      <td className="px-4 py-2 text-right text-indigo-400">{s.ema_mid ? s.ema_mid.toFixed(2) : '-'}</td>
+                      <td className="px-4 py-2 text-right text-slate-400">{s.ema_slow ? s.ema_slow.toFixed(2) : '-'}</td>
+                      <td className="px-4 py-2 text-right text-slate-500">{s.timestamp}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3">Live Paper Trades</h3>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-slate-950/50 border-y border-slate-800 text-slate-400 uppercase tracking-wider text-[10px]">

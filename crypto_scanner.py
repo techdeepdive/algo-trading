@@ -18,6 +18,7 @@ API_URL = "https://api.india.delta.exchange"
 DB_NAME = "crypto_lab.db"
 
 _scanner_running = False
+_crypto_state = []
 
 def init_db():
     conn = sqlite3.connect(DB_NAME)
@@ -165,10 +166,22 @@ def crypto_scanner_loop(api_key, api_secret, tg_bot, tg_chat):
             conn.commit()
             
             # Scan for new signals
+            current_scan_state = []
             for sym in CRYPTO_SYMBOLS:
                 df = fetch_ohlc(sym)
                 if df is not None:
                     df, signal, rc = compute_signals(df)
+                    if df is not None:
+                        current_scan_state.append({
+                            "symbol": sym,
+                            "ltp": rc['close'],
+                            "wpr": rc['WPR'],
+                            "ema_fast": rc['EMA_fast'],
+                            "ema_mid": rc['EMA_mid'],
+                            "ema_slow": rc['EMA_slow'],
+                            "signal": signal,
+                            "timestamp": datetime.datetime.now().strftime("%H:%M:%S")
+                        })
                     if signal in ["LONG", "SHORT"]:
                         # Check if already open
                         c.execute("SELECT id FROM crypto_trades WHERE symbol=? AND status='OPEN'", (sym,))
@@ -194,6 +207,11 @@ def crypto_scanner_loop(api_key, api_secret, tg_bot, tg_chat):
         except Exception as e:
             logger.error(f"Crypto Scanner Error: {e}")
             
+        global _crypto_state
+            _crypto_state = current_scan_state
+        except Exception as e:
+            logger.error(f"Crypto Scanner Error: {e}")
+            
         time.sleep(300) # Sleep 5 minutes between 60m scans
 
 def start_crypto_scanner(api_key, api_secret, tg_bot, tg_chat):
@@ -206,3 +224,4 @@ def start_crypto_scanner(api_key, api_secret, tg_bot, tg_chat):
 def stop_crypto_scanner():
     global _scanner_running
     _scanner_running = False
+_crypto_state = []

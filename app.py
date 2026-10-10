@@ -851,6 +851,11 @@ def api_crypto_state():
     import crypto_scanner
     return jsonify({"status": "running" if crypto_scanner._scanner_running else "idle"})
 
+@app.route("/api/crypto/scanner_state", methods=["GET"])
+def api_crypto_scanner_state():
+    import crypto_scanner
+    return jsonify(crypto_scanner._crypto_state)
+
 @app.route("/api/crypto/trades", methods=["GET"])
 def api_crypto_trades():
     import sqlite3
