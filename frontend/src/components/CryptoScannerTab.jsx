@@ -256,9 +256,9 @@ const CryptoScannerTab = ({ credentials }) => {
                       <td className={`px-4 py-2 text-right font-medium ${s.wpr > -50 ? 'text-emerald-400' : 'text-rose-400'}`}>
                         {s.wpr ? s.wpr.toFixed(2) : '-'}
                       </td>
-                      <td className="px-4 py-2 text-right text-indigo-300">{s.ema_fast ? s.ema_fast.toFixed(2) : '-'}</td>
-                      <td className="px-4 py-2 text-right text-indigo-400">{s.ema_mid ? s.ema_mid.toFixed(2) : '-'}</td>
-                      <td className="px-4 py-2 text-right text-slate-400">{s.ema_slow ? s.ema_slow.toFixed(2) : '-'}</td>
+                      <td className="px-4 py-2 text-right text-indigo-300">{s.ema_fast ? s.ema_fast.toFixed(6) : '-'}</td>
+                      <td className="px-4 py-2 text-right text-indigo-400">{s.ema_mid ? s.ema_mid.toFixed(6) : '-'}</td>
+                      <td className="px-4 py-2 text-right text-slate-400">{s.ema_slow ? s.ema_slow.toFixed(6) : '-'}</td>
                       <td className="px-4 py-2 text-right text-slate-500">{s.timestamp}</td>
                       <td className="px-4 py-2 text-center">
                         <button
@@ -311,12 +311,12 @@ const CryptoScannerTab = ({ credentials }) => {
                       {t.trade_type}
                     </td>
                     <td className="px-4 py-3 text-slate-400 text-right">{t.entry_time}</td>
-                    <td className="px-4 py-3 text-right font-medium text-slate-300">${t.entry_price ? t.entry_price.toFixed(2) : '0.00'}</td>
+                    <td className="px-4 py-3 text-right font-medium text-slate-300">${t.entry_price ? t.entry_price.toFixed(6) : '0.000000'}</td>
                     <td className="px-4 py-3 text-right font-bold text-indigo-300">
                       ${t.current_price ? t.current_price.toFixed(2) : '-'}
                     </td>
-                    <td className="px-4 py-3 text-right text-emerald-400 font-medium">${t.target ? t.target.toFixed(2) : '0.00'}</td>
-                    <td className="px-4 py-3 text-right text-rose-400 font-medium">${t.stop_loss ? t.stop_loss.toFixed(2) : '0.00'}</td>
+                    <td className="px-4 py-3 text-right text-emerald-400 font-medium">${t.target ? t.target.toFixed(6) : '0.000000'}</td>
+                    <td className="px-4 py-3 text-right text-rose-400 font-medium">${t.stop_loss ? t.stop_loss.toFixed(6) : '0.000000'}</td>
                     <td className="px-4 py-3 text-center">
                       <span className={`px-2 py-1 rounded-full text-[10px] font-bold ${
                         t.status === 'OPEN' ? 'bg-amber-500/20 text-amber-400' : 
