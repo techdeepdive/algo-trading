@@ -193,9 +193,9 @@ const CryptoScannerTab = ({ credentials }) => {
         
           <div className="mb-8">
             <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3">Live Scanner State</h3>
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
               <table className="w-full text-sm">
-                <thead className="bg-slate-950/50 border-y border-slate-800 text-slate-400 uppercase tracking-wider text-[10px]">
+                <thead className="bg-slate-950 border-y border-slate-800 text-slate-400 uppercase tracking-wider text-[10px] sticky top-0 z-10">
                   <tr>
                     <th className="px-4 py-2 font-semibold text-left">Symbol</th>
                     <th className="px-4 py-2 font-semibold text-left">Signal</th>
@@ -250,9 +250,9 @@ const CryptoScannerTab = ({ credentials }) => {
           </div>
 
         <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3">Live Paper Trades</h3>
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
           <table className="w-full text-sm">
-            <thead className="bg-slate-950/50 border-y border-slate-800 text-slate-400 uppercase tracking-wider text-[10px]">
+            <thead className="bg-slate-950 border-y border-slate-800 text-slate-400 uppercase tracking-wider text-[10px] sticky top-0 z-10">
               <tr>
                 <th className="px-4 py-3 font-semibold text-left">Symbol</th>
                 <th className="px-4 py-3 font-semibold text-left">Type</th>
