@@ -352,8 +352,8 @@ const CryptoScannerTab = ({ credentials }) => {
                 <th className="px-4 py-3 font-semibold text-right">Entry Time</th>
                 <th className="px-4 py-3 font-semibold text-right">Entry Price</th>
                 <th className="px-4 py-3 font-semibold text-right">Current Price</th>
-                <th className="px-4 py-3 font-semibold text-right">Target (20%)</th>
-                <th className="px-4 py-3 font-semibold text-right">SL (15%)</th>
+                <th className="px-4 py-3 font-semibold text-right">Target (40%)</th>
+                <th className="px-4 py-3 font-semibold text-right">SL (30%)</th>
                 <th className="px-4 py-3 font-semibold text-center">Status</th>
                 <th className="px-4 py-3 font-semibold text-right">PNL</th>
                 <th className="px-4 py-3 font-semibold text-right">Exit Time</th>
@@ -389,7 +389,7 @@ const CryptoScannerTab = ({ credentials }) => {
                       </span>
                     </td>
                     <td className={`px-4 py-3 text-right font-bold ${t.pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                      ₹{(t.pnl * 500).toFixed(2)} <span className="text-[10px] block opacity-70">{t.pnl >= 0 ? '+' : ''}{t.pnl ? t.pnl.toFixed(2) : '0.00'}%</span>
+                      ₹{(t.pnl * 1000).toFixed(2)} <span className="text-[10px] block opacity-70">{t.pnl >= 0 ? '+' : ''}{t.pnl ? t.pnl.toFixed(2) : '0.00'}%</span>
                     </td>
                     <td className="px-4 py-3 text-slate-500 text-right text-[10px]">{t.exit_time || '-'}</td>
                   </tr>

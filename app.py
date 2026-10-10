@@ -873,10 +873,10 @@ def api_crypto_scanner_state():
         closed_count = sum(1 for t in all_trades if t[0] == 'CLOSED')
         
         # t[1] is the percentage move of the underlying (e.g. 0.32 for 0.32%)
-        # For a 10000 INR margin at 5x leverage, position size = 50000 INR.
-        # Absolute PNL in INR = 50000 * (t[1] / 100) = t[1] * 500
-        live_pnl_amt = sum((t[1] * 500) for t in all_trades if t[0] == 'OPEN' and t[1])
-        total_pnl_amt = sum((t[1] * 500) for t in all_trades if t[1])
+        # For a 10000 INR margin at 10x leverage, position size = 100000 INR.
+        # Absolute PNL in INR = 100000 * (t[1] / 100) = t[1] * 1000
+        live_pnl_amt = sum((t[1] * 1000) for t in all_trades if t[0] == 'OPEN' and t[1])
+        total_pnl_amt = sum((t[1] * 1000) for t in all_trades if t[1])
         
         capital_used = open_count * 10000
         total_capital_ever = (open_count + closed_count) * 10000
@@ -954,21 +954,21 @@ def execute_crypto_trade():
         product_id = product['id']
         contract_value = float(product.get('contract_value', 1))
         
-        # User requested: 10000 INR trade, leverage 5.
-        # So Margin = 10000 INR (~116 USDT), Position = 50000 INR (~580 USDT)
+        # User requested: 10000 INR trade, leverage 10.
+        # So Margin = 10000 INR (~116 USDT), Position = 100000 INR (~1160 USDT)
         # Position in crypto = 580 / ltp
         # Size = Position in crypto / contract_value
         tick_size = float(product.get('tick_size', 0.001))
         
         usdt_margin = 10000 / 86.0  # Approx USDT for 10k INR
-        position_value_usdt = usdt_margin * 5
+        position_value_usdt = usdt_margin * 10
         qty_crypto = position_value_usdt / ltp
         size = int(max(1, qty_crypto / contract_value))
         
-        # 1. Set Leverage to 5
+        # 1. Set Leverage to 10
         lev_res = delta_request('POST', f'/v2/products/{product_id}/orders/leverage', api_key, api_secret, json.dumps({
             "margin_type": "isolated",
-            "leverage": "5"
+            "leverage": "10"
         }))
         if lev_res and not lev_res.json().get('success'):
             print(f"Leverage failed: {lev_res.text}")
