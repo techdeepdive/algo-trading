@@ -83,21 +83,33 @@ const CryptoScannerTab = ({ credentials }) => {
   };
 
     
-  const executeLiveTrade = async (symbol, signal, ltp) => {
-    let finalSignal = signal;
-    if (signal === 'NEUTRAL') {
-      const manual = window.prompt(`Force trade for ${symbol} at ${ltp}?\n(Target: +20% Capital, SL: -15% Capital)\nEnter 'LONG' or 'SHORT':`);
-      if (manual && (manual.toUpperCase() === 'LONG' || manual.toUpperCase() === 'SHORT')) {
-        finalSignal = manual.toUpperCase();
-      } else {
-        return;
-      }
+  const executeLiveTrade = (symbol, signal, ltp) => {
+    let sl = 0;
+    let tgt = 0;
+    const isLong = signal === 'LONG' || signal === 'NEUTRAL';
+    if (isLong) {
+      sl = ltp * 0.97;
+      tgt = ltp * 1.04;
     } else {
-      if (!window.confirm(`Execute ${signal} on ${symbol} at ${ltp}?\n(Target: +20% Capital, SL: -15% Capital)`)) return;
+      sl = ltp * 1.03;
+      tgt = ltp * 0.96;
     }
+    setTradeModal({
+      open: true,
+      symbol,
+      signal: signal === 'NEUTRAL' ? 'LONG' : signal,
+      ltp,
+      sl: parseFloat(sl.toFixed(4)),
+      tgt: parseFloat(tgt.toFixed(4))
+    });
+  };
 
+  const confirmTrade = async () => {
     const credsStr = localStorage.getItem('algo_creds');
     const creds = credsStr ? JSON.parse(credsStr) : {};
+    const { symbol, signal, ltp, sl, tgt } = tradeModal;
+    
+    setTradeModal({ ...tradeModal, open: false });
 
     try {
       const res = await fetch('/api/crypto/execute_trade', {
@@ -107,7 +119,7 @@ const CryptoScannerTab = ({ credentials }) => {
           'Delta-Api-Key': creds.delta_api_key || '',
           'Delta-Api-Secret': creds.delta_api_secret || ''
         },
-        body: JSON.stringify({ symbol, signal: finalSignal, ltp })
+        body: JSON.stringify({ symbol, signal, ltp, sl, tgt })
       });
       const data = await res.json();
       if (data.status === 'success') {
@@ -117,7 +129,7 @@ const CryptoScannerTab = ({ credentials }) => {
         alert(data.message);
       }
     } catch (e) {
-      alert("Failed to execute live trade");
+      alert("Error: " + e.message);
     }
   };
 
