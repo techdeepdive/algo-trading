@@ -68,7 +68,7 @@ def fetch_ohlc(symbol):
     # We fetch last 100 candles.
     end_time = int(time.time())
     start_time = end_time - (100 * 60 * 60)
-    url = f"{API_URL}/v2/history/candles?symbol={symbol}USD&resolution=1h&start={start_time}&end={end_time}"
+    url = f"{API_URL}/v2/history/candles?symbol={symbol}USD&resolution=15m&start={start_time}&end={end_time}"
     try:
         res = requests.get(url, timeout=10)
         data = res.json()
@@ -209,7 +209,7 @@ def crypto_scanner_loop(api_key, api_secret, tg_bot, tg_chat):
         except Exception as e:
             logger.error(f"Crypto Scanner Error: {e}")
             
-        time.sleep(300) # Sleep 5 minutes between 60m scans
+        time.sleep(60) # Sleep 5 minutes between 60m scans
 
 def start_crypto_scanner(api_key, api_secret, tg_bot, tg_chat):
     global _scanner_running

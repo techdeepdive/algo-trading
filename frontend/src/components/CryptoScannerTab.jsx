@@ -155,7 +155,7 @@ const CryptoScannerTab = ({ credentials }) => {
           <div className="bg-slate-950 border border-slate-800/50 rounded-lg p-4">
             <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Delta Balance</div>
             <div className="text-lg font-bold text-white">
-              {balance !== null ? `${balance} USDT` : '-'}
+              {balance !== null ? `₹${(parseFloat(balance) * 86.0).toFixed(2)} INR` : '-'}
             </div>
           </div>
           <div className="bg-slate-950 border border-slate-800/50 rounded-lg p-4">
@@ -191,12 +191,13 @@ const CryptoScannerTab = ({ credentials }) => {
                     <th className="px-4 py-2 font-semibold text-right">15 EMA</th>
                     <th className="px-4 py-2 font-semibold text-right">50 EMA</th>
                     <th className="px-4 py-2 font-semibold text-right">Time</th>
+                    <th className="px-4 py-2 font-semibold text-center">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/50">
                   {scannerState.length === 0 ? (
                     <tr>
-                      <td colSpan="8" className="px-4 py-8 text-center text-slate-500 italic">
+                      <td colSpan="9" className="px-4 py-8 text-center text-slate-500 italic">
                         {engineState === 'running' ? 'Scanning crypto markets... Data will appear shortly.' : 'Engine stopped. Start engine to view live scanner state.'}
                       </td>
                     </tr>
@@ -215,6 +216,19 @@ const CryptoScannerTab = ({ credentials }) => {
                       <td className="px-4 py-2 text-right text-indigo-400">{s.ema_mid ? s.ema_mid.toFixed(2) : '-'}</td>
                       <td className="px-4 py-2 text-right text-slate-400">{s.ema_slow ? s.ema_slow.toFixed(2) : '-'}</td>
                       <td className="px-4 py-2 text-right text-slate-500">{s.timestamp}</td>
+                      <td className="px-4 py-2 text-center">
+                        <button
+                          onClick={() => executeLiveTrade(s.symbol, s.signal, s.ltp)}
+                          className={`px-3 py-1 rounded text-xs font-bold transition-colors ${
+                            s.signal === 'LONG' ? 'bg-emerald-600 hover:bg-emerald-500 text-white' :
+                            s.signal === 'SHORT' ? 'bg-rose-600 hover:bg-rose-500 text-white' :
+                            'bg-slate-700 text-slate-400 cursor-not-allowed'
+                          }`}
+                          disabled={s.signal === 'NEUTRAL'}
+                        >
+                          Live Trade
+                        </button>
+                      </td>
                     </tr>
                   )))}
                 </tbody>

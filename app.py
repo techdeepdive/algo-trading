@@ -873,3 +873,80 @@ def api_crypto_trades():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=PORT, debug=False)
+
+@app.route('/api/crypto/execute_trade', methods=['POST'])
+def execute_crypto_trade():
+    data = request.json
+    api_key = request.headers.get('Delta-Api-Key')
+    api_secret = request.headers.get('Delta-Api-Secret')
+    
+    if not api_key or not api_secret:
+        return jsonify({"status": "error", "message": "Delta API credentials missing"}), 400
+        
+    symbol = data.get('symbol')
+    signal = data.get('signal')
+    ltp = data.get('ltp')
+    
+    if not symbol or not signal:
+        return jsonify({"status": "error", "message": "Missing symbol or signal"}), 400
+
+    try:
+        # Get product_id for the symbol
+        res = requests.get(f"{API_URL}/v2/products")
+        products = res.json().get('result', [])
+        
+        target_symbol = f"{symbol}USD"
+        product = next((p for p in products if p['symbol'] == target_symbol), None)
+        
+        if not product:
+            return jsonify({"status": "error", "message": f"Product {target_symbol} not found on Delta"}), 404
+            
+        product_id = product['id']
+        contract_value = float(product.get('contract_value', 1))
+        
+        # User requested: 10000 INR trade, leverage 5.
+        # So Margin = 10000 INR (~116 USDT), Position = 50000 INR (~580 USDT)
+        # Position in crypto = 580 / ltp
+        # Size = Position in crypto / contract_value
+        usdt_margin = 10000 / 86.0  # Approx USDT for 10k INR
+        position_value_usdt = usdt_margin * 5
+        qty_crypto = position_value_usdt / ltp
+        size = int(max(1, qty_crypto / contract_value))
+        
+        # 1. Set Leverage to 5
+        delta_request(api_key, api_secret, 'POST', '/v2/products/leverage', {
+            "product_id": product_id,
+            "margin_type": "isolated",
+            "leverage": "5"
+        })
+        
+        # 2. Place Order
+        order_payload = {
+            "product_id": product_id,
+            "size": size,
+            "side": "buy" if signal == "LONG" else "sell",
+            "order_type": "market_order"
+        }
+        
+        order_res = delta_request(api_key, api_secret, 'POST', '/v2/orders', order_payload)
+        order_data = order_res.json() if order_res else {}
+        
+        if not order_data.get('success'):
+            return jsonify({"status": "error", "message": f"Order failed: {order_data.get('error', 'Unknown')}"}), 400
+            
+        # Add to local DB
+        import sqlite3
+        import datetime
+        conn = sqlite3.connect('crypto_lab.db')
+        c = conn.cursor()
+        sl = ltp * 0.85 if signal == "LONG" else ltp * 1.15
+        tgt = ltp * 1.20 if signal == "LONG" else ltp * 0.80
+        c.execute("INSERT INTO crypto_trades (symbol, trade_type, entry_time, entry_price, current_price, stop_loss, target, status, pnl) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                  (symbol, signal, datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), ltp, ltp, sl, tgt, 'OPEN', 0.0))
+        conn.commit()
+        conn.close()
+        
+        return jsonify({"status": "success", "message": f"Placed {signal} on {symbol}!"})
+        
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
