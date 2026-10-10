@@ -915,6 +915,8 @@ def execute_crypto_trade():
     data = request.json
     print(f"Manual Crypto Trade Requested: {data.get('signal')} on {data.get('symbol')}")
     api_key = request.headers.get('Delta-Api-Key')
+    import json
+    API_URL = 'https://api.delta.exchange'
     api_secret = request.headers.get('Delta-Api-Secret')
     
     if not api_key or not api_secret:
@@ -929,7 +931,7 @@ def execute_crypto_trade():
 
     try:
         # Get product_id for the symbol
-        res = requests.get(f"{API_URL}/v2/products")
+        res = requests.get(f"https://api.delta.exchange/v2/products")
         products = res.json().get('result', [])
         
         target_symbol = f"{symbol}USD"
@@ -951,11 +953,11 @@ def execute_crypto_trade():
         size = int(max(1, qty_crypto / contract_value))
         
         # 1. Set Leverage to 5
-        delta_request(api_key, api_secret, 'POST', '/v2/products/leverage', {
+        delta_request('POST', '/v2/products/leverage', api_key, api_secret, json.dumps({
             "product_id": product_id,
             "margin_type": "isolated",
             "leverage": "5"
-        })
+        }))
         
         sl = ltp * 0.97 if signal == "LONG" else ltp * 1.03
         tgt = ltp * 1.04 if signal == "LONG" else ltp * 0.96
@@ -971,7 +973,7 @@ def execute_crypto_trade():
             "bracket_stop_trigger_method": "last_traded_price"
         }
         
-        order_res = delta_request(api_key, api_secret, 'POST', '/v2/orders', order_payload)
+        order_res = delta_request('POST', '/v2/orders', api_key, api_secret, json.dumps(order_payload))
         order_data = order_res.json() if order_res else {}
         
         if not order_data.get('success'):
