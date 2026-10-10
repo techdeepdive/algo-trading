@@ -177,7 +177,6 @@ const CryptoScannerTab = ({ credentials }) => {
         </div>
 
         
-        {scannerState.length > 0 && (
           <div className="mb-8">
             <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3">Live Scanner State</h3>
             <div className="overflow-x-auto">
@@ -195,7 +194,14 @@ const CryptoScannerTab = ({ credentials }) => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/50">
-                  {scannerState.map((s, i) => (
+                  {scannerState.length === 0 ? (
+                    <tr>
+                      <td colSpan="8" className="px-4 py-8 text-center text-slate-500 italic">
+                        {engineState === 'running' ? 'Scanning crypto markets... Data will appear shortly.' : 'Engine stopped. Start engine to view live scanner state.'}
+                      </td>
+                    </tr>
+                  ) : (
+                  scannerState.map((s, i) => (
                     <tr key={i} className="hover:bg-slate-900/50 transition-colors text-xs">
                       <td className="px-4 py-2 font-bold text-white">{s.symbol}</td>
                       <td className={`px-4 py-2 font-bold ${s.signal === 'LONG' ? 'text-emerald-400' : s.signal === 'SHORT' ? 'text-rose-400' : 'text-slate-500'}`}>
@@ -210,12 +216,11 @@ const CryptoScannerTab = ({ credentials }) => {
                       <td className="px-4 py-2 text-right text-slate-400">{s.ema_slow ? s.ema_slow.toFixed(2) : '-'}</td>
                       <td className="px-4 py-2 text-right text-slate-500">{s.timestamp}</td>
                     </tr>
-                  ))}
+                  )))}
                 </tbody>
               </table>
             </div>
           </div>
-        )}
 
         <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3">Live Paper Trades</h3>
         <div className="overflow-x-auto">
