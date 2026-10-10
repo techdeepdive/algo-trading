@@ -950,3 +950,16 @@ def execute_crypto_trade():
         
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/crypto/clear_trades', methods=['POST'])
+def clear_crypto_trades():
+    try:
+        import sqlite3
+        conn = sqlite3.connect('crypto_lab.db')
+        cur = conn.cursor()
+        cur.execute("DELETE FROM crypto_trades")
+        conn.commit()
+        conn.close()
+        return jsonify({"status": "success", "message": "All crypto trades cleared."})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500

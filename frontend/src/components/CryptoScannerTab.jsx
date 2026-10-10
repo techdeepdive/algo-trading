@@ -80,6 +80,18 @@ const CryptoScannerTab = ({ credentials }) => {
     setLoading(false);
   };
 
+    const clearCryptoData = async () => {
+    if (!window.confirm("Are you sure you want to clear all crypto paper trades?")) return;
+    try {
+      const res = await fetch('/api/crypto/clear_trades', { method: 'POST' });
+      const data = await res.json();
+      if (data.status === 'success') fetchCryptoState();
+      else alert(data.message);
+    } catch (e) {
+      alert("Failed to clear data");
+    }
+  };
+
   const startEngine = async () => {
     setLoading(true);
     try {
