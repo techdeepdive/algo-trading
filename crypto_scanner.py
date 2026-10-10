@@ -101,11 +101,13 @@ def compute_signals(df, ema_fast=5, ema_mid=15, ema_slow=50, wpr_period=70):
     bullish = (
         (pc['EMA_fast'] <= pc['EMA_mid'] and rc['EMA_fast'] > rc['EMA_mid'])
         and (rc['close'] > rc['EMA_slow'])
+        and (rc['EMA_fast'] > rc['EMA_slow'])
         and (rc['WPR'] > -50)
     )
     bearish = (
         (pc['EMA_fast'] >= pc['EMA_mid'] and rc['EMA_fast'] < rc['EMA_mid'])
         and (rc['close'] < rc['EMA_slow'])
+        and (rc['EMA_fast'] < rc['EMA_slow'])
         and (rc['WPR'] < -50)
     )
 
