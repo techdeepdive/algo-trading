@@ -222,9 +222,8 @@ const CryptoScannerTab = ({ credentials }) => {
                           className={`px-3 py-1 rounded text-xs font-bold transition-colors ${
                             s.signal === 'LONG' ? 'bg-emerald-600 hover:bg-emerald-500 text-white' :
                             s.signal === 'SHORT' ? 'bg-rose-600 hover:bg-rose-500 text-white' :
-                            'bg-slate-700 text-slate-400 cursor-not-allowed'
+                            'bg-indigo-600 hover:bg-indigo-500 text-white shadow shadow-indigo-500/20'
                           }`}
-                          disabled={s.signal === 'NEUTRAL'}
                         >
                           Live Trade
                         </button>
