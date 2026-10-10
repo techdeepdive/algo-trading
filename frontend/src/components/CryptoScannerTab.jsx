@@ -142,6 +142,12 @@ const CryptoScannerTab = ({ credentials }) => {
             </span>
           </h2>
           <div className="flex gap-2">
+            <button
+              onClick={clearCryptoData}
+              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-white font-medium text-sm transition-colors border border-slate-700"
+            >
+              Clear Data
+            </button>
             <button 
               onClick={fetchBalance}
               disabled={loading}
