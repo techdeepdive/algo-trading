@@ -871,17 +871,28 @@ def api_crypto_scanner_state():
         
         open_count = sum(1 for t in all_trades if t[0] == 'OPEN')
         closed_count = sum(1 for t in all_trades if t[0] == 'CLOSED')
-        live_pnl = sum(t[1] for t in all_trades if t[0] == 'OPEN' and t[1])
-        total_pnl = sum(t[1] for t in all_trades if t[1])
+        
+        # t[1] is the percentage move of the underlying (e.g. 0.32 for 0.32%)
+        # For a 10000 INR margin at 5x leverage, position size = 50000 INR.
+        # Absolute PNL in INR = 50000 * (t[1] / 100) = t[1] * 500
+        live_pnl_amt = sum((t[1] * 500) for t in all_trades if t[0] == 'OPEN' and t[1])
+        total_pnl_amt = sum((t[1] * 500) for t in all_trades if t[1])
+        
         capital_used = open_count * 10000
+        total_capital_ever = (open_count + closed_count) * 10000
+        
+        live_pnl_pct = (live_pnl_amt / capital_used * 100) if capital_used > 0 else 0.0
+        total_pnl_pct = (total_pnl_amt / total_capital_ever * 100) if total_capital_ever > 0 else 0.0
         
         stats = {
             "last_sweep": last_sweep,
             "open_trades": open_count,
             "closed_trades": closed_count,
             "capital_used": capital_used,
-            "live_pnl": live_pnl,
-            "total_pnl": total_pnl
+            "live_pnl_amt": live_pnl_amt,
+            "live_pnl_pct": live_pnl_pct,
+            "total_pnl_amt": total_pnl_amt,
+            "total_pnl_pct": total_pnl_pct
         }
     except:
         stats = {}

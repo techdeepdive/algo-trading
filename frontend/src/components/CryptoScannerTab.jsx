@@ -389,7 +389,7 @@ const CryptoScannerTab = ({ credentials }) => {
                       </span>
                     </td>
                     <td className={`px-4 py-3 text-right font-bold ${t.pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                      ₹{(t.pnl * 100).toFixed(2)} <span className="text-[10px] block opacity-70">{t.pnl >= 0 ? '+' : ''}{t.pnl ? t.pnl.toFixed(2) : '0.00'}%</span>
+                      ₹{(t.pnl * 500).toFixed(2)} <span className="text-[10px] block opacity-70">{t.pnl >= 0 ? '+' : ''}{t.pnl ? t.pnl.toFixed(2) : '0.00'}%</span>
                     </td>
                     <td className="px-4 py-3 text-slate-500 text-right text-[10px]">{t.exit_time || '-'}</td>
                   </tr>
