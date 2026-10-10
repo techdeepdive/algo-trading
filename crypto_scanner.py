@@ -77,6 +77,8 @@ def fetch_ohlc(symbol):
             df = pd.DataFrame(data['result'])
             df.rename(columns={'time': 'datetime'}, inplace=True)
             df['datetime'] = pd.to_datetime(df['datetime'], unit='s')
+            df.sort_values('datetime', ascending=True, inplace=True)
+            df.reset_index(drop=True, inplace=True)
             for col in ['open', 'high', 'low', 'close', 'volume']:
                 df[col] = df[col].astype(float)
             return df
