@@ -151,27 +151,41 @@ const CryptoScannerTab = ({ credentials }) => {
           </div>
         </div>
 
-        <div className="grid grid-cols-4 gap-4 mb-6">
-          <div className="bg-slate-950 border border-slate-800/50 rounded-lg p-4">
-            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Delta Balance</div>
+        <div className="grid grid-cols-6 gap-4 mb-6">
+          <div className="bg-slate-950 border border-slate-800/50 rounded-lg p-4 flex flex-col justify-center">
+            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Engine</div>
+            <div className={`text-lg font-bold ${engineState === 'running' ? 'text-emerald-400' : 'text-slate-400'}`}>
+              {engineState === 'running' ? 'RUNNING' : 'STOPPED'}
+            </div>
+          </div>
+          <div className="bg-slate-950 border border-slate-800/50 rounded-lg p-4 flex flex-col justify-center">
+            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Last Sweep</div>
+            <div className="text-md font-bold text-white truncate" title={stats.last_sweep || 'N/A'}>
+              {stats.last_sweep ? stats.last_sweep.split(' ')[1] || stats.last_sweep : 'N/A'}
+            </div>
+          </div>
+          <div className="bg-slate-950 border border-slate-800/50 rounded-lg p-4 flex flex-col justify-center">
+            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Open/Closed</div>
             <div className="text-lg font-bold text-white">
-              {balance !== null ? `₹${(parseFloat(balance) * 86.0).toFixed(2)} INR` : '-'}
+              {stats.open_trades || 0} / {stats.closed_trades || 0}
             </div>
           </div>
-          <div className="bg-slate-950 border border-slate-800/50 rounded-lg p-4">
-            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Open Trades</div>
-            <div className="text-lg font-bold text-white">{trades.filter(t => t.status === 'OPEN').length}</div>
-          </div>
-          <div className="bg-slate-950 border border-slate-800/50 rounded-lg p-4">
-            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Live PNL %</div>
-            <div className={`text-lg font-bold ${livePnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-              {livePnl > 0 ? '+' : ''}{livePnl.toFixed(2)}%
+          <div className="bg-slate-950 border border-slate-800/50 rounded-lg p-4 flex flex-col justify-center">
+            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Capital Used</div>
+            <div className="text-lg font-bold text-indigo-400">
+              ₹{(stats.capital_used || 0).toLocaleString()}
             </div>
           </div>
-          <div className="bg-slate-950 border border-slate-800/50 rounded-lg p-4">
-            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Total PNL %</div>
-            <div className={`text-lg font-bold ${totalPnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-              {totalPnl > 0 ? '+' : ''}{totalPnl.toFixed(2)}%
+          <div className="bg-slate-950 border border-slate-800/50 rounded-lg p-4 flex flex-col justify-center">
+            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Live PNL</div>
+            <div className={`text-lg font-bold ${stats.live_pnl_amt >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+              ₹{(stats.live_pnl_amt || 0).toLocaleString()} <span className="text-xs opacity-70">({(stats.live_pnl_pct || 0).toFixed(2)}%)</span>
+            </div>
+          </div>
+          <div className="bg-slate-950 border border-slate-800/50 rounded-lg p-4 flex flex-col justify-center">
+            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Total PNL</div>
+            <div className={`text-lg font-bold ${stats.total_pnl_amt >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+              ₹{(stats.total_pnl_amt || 0).toLocaleString()} <span className="text-xs opacity-70">({(stats.total_pnl_pct || 0).toFixed(2)}%)</span>
             </div>
           </div>
         </div>
@@ -197,7 +211,7 @@ const CryptoScannerTab = ({ credentials }) => {
                 <tbody className="divide-y divide-slate-800/50">
                   {scannerState.length === 0 ? (
                     <tr>
-                      <td colSpan="9" className="px-4 py-8 text-center text-slate-500 italic">
+                      <td colSpan="10" className="px-4 py-8 text-center text-slate-500 italic">
                         {engineState === 'running' ? 'Scanning crypto markets... Data will appear shortly.' : 'Engine stopped. Start engine to view live scanner state.'}
                       </td>
                     </tr>
@@ -248,13 +262,14 @@ const CryptoScannerTab = ({ credentials }) => {
                 <th className="px-4 py-3 font-semibold text-right">Target (20%)</th>
                 <th className="px-4 py-3 font-semibold text-right">SL (15%)</th>
                 <th className="px-4 py-3 font-semibold text-center">Status</th>
-                <th className="px-4 py-3 font-semibold text-right">PNL %</th>
+                <th className="px-4 py-3 font-semibold text-right">PNL</th>
+                <th className="px-4 py-3 font-semibold text-right">Exit Time</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/50">
               {trades.length === 0 ? (
                 <tr>
-                  <td colSpan="9" className="px-4 py-8 text-center text-slate-500 italic">
+                  <td colSpan="10" className="px-4 py-8 text-center text-slate-500 italic">
                     No crypto trades executed yet. Start the engine to scan for signals.
                   </td>
                 </tr>
@@ -281,8 +296,9 @@ const CryptoScannerTab = ({ credentials }) => {
                       </span>
                     </td>
                     <td className={`px-4 py-3 text-right font-bold ${t.pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                      {t.pnl >= 0 ? '+' : ''}{t.pnl ? t.pnl.toFixed(2) : '0.00'}%
+                      ₹{(t.pnl * 100).toFixed(2)} <span className="text-[10px] block opacity-70">{t.pnl >= 0 ? '+' : ''}{t.pnl ? t.pnl.toFixed(2) : '0.00'}%</span>
                     </td>
+                    <td className="px-4 py-3 text-slate-500 text-right text-[10px]">{t.exit_time || '-'}</td>
                   </tr>
                 ))
               )}

@@ -939,10 +939,10 @@ def execute_crypto_trade():
         import datetime
         conn = sqlite3.connect('crypto_lab.db')
         c = conn.cursor()
-        sl = ltp * 0.85 if signal == "LONG" else ltp * 1.15
-        tgt = ltp * 1.20 if signal == "LONG" else ltp * 0.80
+        sl = ltp * 0.97 if signal == "LONG" else ltp * 1.03
+        tgt = ltp * 1.04 if signal == "LONG" else ltp * 0.96
         c.execute("INSERT INTO crypto_trades (symbol, trade_type, entry_time, entry_price, current_price, stop_loss, target, status, pnl) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                  (symbol, signal, datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), ltp, ltp, sl, tgt, 'OPEN', 0.0))
+                  (symbol, signal, datetime.datetime.now(pytz.timezone('Asia/Kolkata')).strftime("%Y-%m-%d %H:%M:%S"), ltp, ltp, sl, tgt, 'OPEN', 0.0))
         conn.commit()
         conn.close()
         

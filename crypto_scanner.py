@@ -1,6 +1,7 @@
 import os
 import time
 import json
+import pytz
 import hmac
 import hashlib
 import threading
@@ -160,7 +161,7 @@ def crypto_scanner_loop(api_key, api_secret, tg_bot, tg_chat):
                     elif (t_type == 'LONG' and ltp >= tgt) or (t_type == 'SHORT' and ltp <= tgt):
                         status = 'CLOSED_TARGET'
                         
-                    exit_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S") if status != 'OPEN' else None
+                    exit_time = datetime.datetime.now(pytz.timezone('Asia/Kolkata')).strftime("%Y-%m-%d %H:%M:%S") if status != 'OPEN' else None
                     c.execute("UPDATE crypto_trades SET current_price=?, pnl=?, status=?, exit_time=? WHERE id=?", (ltp, pnl_pct, status, exit_time, t_id))
             
             conn.commit()
@@ -180,18 +181,18 @@ def crypto_scanner_loop(api_key, api_secret, tg_bot, tg_chat):
                             "ema_mid": rc['EMA_mid'],
                             "ema_slow": rc['EMA_slow'],
                             "signal": signal,
-                            "timestamp": datetime.datetime.now().strftime("%H:%M:%S")
+                            "timestamp": datetime.datetime.now(pytz.timezone('Asia/Kolkata')).strftime("%H:%M:%S")
                         })
                     if signal in ["LONG", "SHORT"]:
                         # Check if already open
                         c.execute("SELECT id FROM crypto_trades WHERE symbol=? AND status='OPEN'", (sym,))
                         if not c.fetchone():
                             ltp = rc['close']
-                            sl = ltp * 0.85 if signal == "LONG" else ltp * 1.15
-                            tgt = ltp * 1.20 if signal == "LONG" else ltp * 0.80
+                            sl = ltp * 0.97 if signal == "LONG" else ltp * 1.03
+                            tgt = ltp * 1.04 if signal == "LONG" else ltp * 0.96
                             
                             c.execute("INSERT INTO crypto_trades (symbol, trade_type, entry_time, entry_price, current_price, stop_loss, target, status, pnl) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                                      (sym, signal, datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), ltp, ltp, sl, tgt, 'OPEN', 0.0))
+                                      (sym, signal, datetime.datetime.now(pytz.timezone('Asia/Kolkata')).strftime("%Y-%m-%d %H:%M:%S"), ltp, ltp, sl, tgt, 'OPEN', 0.0))
                             conn.commit()
                             
                             msg = f"🚨 <b>CRYPTO {signal}</b> 🚨\nSymbol: {sym}USD\nLTP: {ltp}\nTarget: {tgt:.2f} (20%)\nSL: {sl:.2f} (15%)"
@@ -202,10 +203,32 @@ def crypto_scanner_loop(api_key, api_secret, tg_bot, tg_chat):
                                 ]
                             }
                             send_telegram(msg, tg_bot, tg_chat, keyboard)
+                            alert_batch.append(f"{signal} {sym} at {ltp}")
                             
             conn.close()
             global _crypto_state
+            
+            # Inject last sweep time into the first item
+            if len(current_scan_state) > 0:
+                current_scan_state[0]['last_sweep'] = scan_time
+                
             _crypto_state = current_scan_state
+            
+            # Send AI Summary
+            if len(alert_batch) > 0:
+                import os, google.generativeai as genai
+                gemini_key = os.getenv("GEMINI_API_KEY")
+                if gemini_key:
+                    try:
+                        genai.configure(api_key=gemini_key)
+                        model = genai.GenerativeModel('gemini-1.5-flash')
+                        prompt = "You are a professional crypto trading analyst. Summarize these trading alerts in 2-3 engaging sentences highlighting the market action: " + ", ".join(alert_batch)
+                        resp = model.generate_content(prompt)
+                        if resp and resp.text:
+                            ai_msg = f"🤖 <b>AI Crypto Summary</b>\n\n{resp.text}"
+                            send_telegram(ai_msg, tg_bot, tg_chat)
+                    except Exception as e:
+                        logger.error(f"Gemini API Error: {e}")
         except Exception as e:
             logger.error(f"Crypto Scanner Error: {e}")
             
