@@ -85,7 +85,7 @@ const CryptoScannerTab = ({ credentials }) => {
     try {
       const res = await fetch('/api/crypto/clear_trades', { method: 'POST' });
       const data = await res.json();
-      if (data.status === 'success') fetchCryptoState();
+      if (data.status === 'success') window.location.reload();
       else alert(data.message);
     } catch (e) {
       alert("Failed to clear data");
