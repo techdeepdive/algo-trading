@@ -947,17 +947,20 @@ def execute_crypto_trade():
         # So Margin = 10000 INR (~116 USDT), Position = 50000 INR (~580 USDT)
         # Position in crypto = 580 / ltp
         # Size = Position in crypto / contract_value
+        tick_size = float(product.get('tick_size', 0.001))
+        
         usdt_margin = 10000 / 86.0  # Approx USDT for 10k INR
         position_value_usdt = usdt_margin * 5
         qty_crypto = position_value_usdt / ltp
         size = int(max(1, qty_crypto / contract_value))
         
         # 1. Set Leverage to 5
-        delta_request('POST', '/v2/products/leverage', api_key, api_secret, json.dumps({
-            "product_id": product_id,
+        lev_res = delta_request('POST', f'/v2/products/{product_id}/orders/leverage', api_key, api_secret, json.dumps({
             "margin_type": "isolated",
             "leverage": "5"
         }))
+        if lev_res and not lev_res.json().get('success'):
+            print(f"Leverage failed: {lev_res.text}")
         
         sl = data.get('sl')
         tgt = data.get('tgt')
@@ -969,14 +972,23 @@ def execute_crypto_trade():
         sl = float(sl)
         tgt = float(tgt)
 
+        sl_rounded = round(sl / tick_size) * tick_size
+        tgt_rounded = round(tgt / tick_size) * tick_size
+
+        def format_price(p):
+            s = f"{p:.8f}".rstrip('0')
+            if s.endswith('.'):
+                s = s[:-1]
+            return s
+
         # 2. Place Order with Brackets
         order_payload = {
             "product_id": product_id,
             "size": size,
             "side": "buy" if signal == "LONG" else "sell",
             "order_type": "market_order",
-            "bracket_stop_loss_price": str(round(sl, 4)),
-            "bracket_take_profit_price": str(round(tgt, 4)),
+            "bracket_stop_loss_price": format_price(sl_rounded),
+            "bracket_take_profit_price": format_price(tgt_rounded),
             "bracket_stop_trigger_method": "last_traded_price"
         }
         
