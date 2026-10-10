@@ -624,7 +624,6 @@ def api_news():
             
     return jsonify({"status": "success", "news": results})
 
-from scanner_backend import start_scanner, stop_scanner, get_scanner_state, get_paper_trades
 from crypto_scanner import start_crypto_scanner, stop_crypto_scanner, delta_request, DB_NAME as CRYPTO_DB
 from scanner_backend import start_scanner, stop_scanner, get_dashboard_state, run_screener
 
