@@ -3,6 +3,7 @@ import { Loader2 } from 'lucide-react';
 
 const CryptoScannerTab = ({ credentials }) => {
   const [engineState, setEngineState] = useState('idle');
+  const [stats, setStats] = useState({});
   const [trades, setTrades] = useState([]);
   const [scannerState, setScannerState] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -46,7 +47,12 @@ const CryptoScannerTab = ({ credentials }) => {
       try {
         const res = await fetch('/api/crypto/scanner_state');
         const data = await res.json();
-        if (Array.isArray(data)) setScannerState(data);
+        if (data.status === 'success') {
+          setScannerState(data.scanner_state || []);
+          setStats(data.stats || {});
+        } else if (Array.isArray(data)) {
+          setScannerState(data); // Fallback for old API if needed
+        }
       } catch (e) {}
     };
     fetchScannerState();
