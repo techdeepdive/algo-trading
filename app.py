@@ -854,7 +854,43 @@ def api_crypto_state():
 @app.route("/api/crypto/scanner_state", methods=["GET"])
 def api_crypto_scanner_state():
     import crypto_scanner
-    return jsonify(crypto_scanner._crypto_state)
+    import sqlite3
+    
+    state = crypto_scanner._crypto_state
+    last_sweep = "N/A"
+    if state and len(state) > 0 and 'last_sweep' in state[0]:
+        last_sweep = state[0]['last_sweep']
+        
+    # Calculate stats from db
+    try:
+        conn = sqlite3.connect('crypto_lab.db')
+        cur = conn.cursor()
+        cur.execute("SELECT status, pnl FROM crypto_trades")
+        all_trades = cur.fetchall()
+        conn.close()
+        
+        open_count = sum(1 for t in all_trades if t[0] == 'OPEN')
+        closed_count = sum(1 for t in all_trades if t[0] == 'CLOSED')
+        live_pnl = sum(t[1] for t in all_trades if t[0] == 'OPEN' and t[1])
+        total_pnl = sum(t[1] for t in all_trades if t[1])
+        capital_used = open_count * 10000
+        
+        stats = {
+            "last_sweep": last_sweep,
+            "open_trades": open_count,
+            "closed_trades": closed_count,
+            "capital_used": capital_used,
+            "live_pnl": live_pnl,
+            "total_pnl": total_pnl
+        }
+    except:
+        stats = {}
+        
+    return jsonify({
+        "status": "success",
+        "scanner_state": state,
+        "stats": stats
+    })
 
 @app.route("/api/crypto/trades", methods=["GET"])
 def api_crypto_trades():
