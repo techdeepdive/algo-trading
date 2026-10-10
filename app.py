@@ -831,6 +831,25 @@ def api_stop_crypto():
     stop_crypto_scanner()
     return jsonify({"status": "success", "message": "Crypto Scanner Stopped"})
 
+@app.route("/api/crypto/balance", methods=["POST"])
+def api_crypto_balance():
+    data = request.json
+    api_key = data.get("delta_api_key")
+    api_secret = data.get("delta_api_secret")
+    if not api_key or not api_secret:
+        return jsonify({"status": "error", "message": "Delta credentials required"}), 400
+    res = delta_request('GET', '/v2/wallet/balances', api_key, api_secret)
+    if res and res.status_code == 200:
+        balances = res.json().get('result', [])
+        usdt_bal = next((b['available_balance'] for b in balances if b['asset_symbol'] == 'USDT'), 0)
+        return jsonify({"status": "success", "balance": usdt_bal})
+    return jsonify({"status": "error", "message": "Failed to fetch balance"}), 400
+
+@app.route("/api/crypto/state", methods=["GET"])
+def api_crypto_state():
+    import crypto_scanner
+    return jsonify({"status": "running" if crypto_scanner._scanner_running else "idle"})
+
 @app.route("/api/crypto/trades", methods=["GET"])
 def api_crypto_trades():
     import sqlite3
